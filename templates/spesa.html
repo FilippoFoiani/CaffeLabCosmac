@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Spesa') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ _('Ho comprato per il gruppo') }}</h1>
+<p class="aiuto">{{ _("Hai comprato caffè, cialde, zucchero o bicchierini per tutti? Registra la spesa: l'importo ti viene accreditato. La spesa è visibile a tutti nei movimenti.") }}</p>
+<form method="post" action="{{ url_for('spesa') }}" class="modulo">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input type="hidden" name="nonce" value="{{ nonce }}">
+  <label for="nota">{{ _('Cosa hai comprato') }}</label>
+  <input id="nota" name="nota" maxlength="200" required placeholder="{{ _('es. 2 kg di caffè') }}" value="{{ form.get('nota', '') }}">
+  <label for="importo">{{ _('Quanto hai speso (€)') }}</label>
+  <input id="importo" name="importo" inputmode="decimal" required placeholder="{{ _('es. 18,90') }}" value="{{ form.get('importo', '') }}">
+  <button type="submit" class="btn">{{ _('Registra la spesa') }}</button>
+</form>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

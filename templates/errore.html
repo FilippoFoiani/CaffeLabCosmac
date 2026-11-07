@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block contenuto %}
+<section class="scheda">
+  <h1>{{ _('Ops') }}</h1>
+  <p>{{ messaggio }}</p>
+  <a class="btn" href="{{ url_for('home') }}">{{ _('Torna alla pagina principale') }}</a>
+</section>
+{% endblock %}

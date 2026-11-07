@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Saldi') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ _('Saldi di tutti') }}</h1>
+<div class="riassunto">
+  <div><span class="piccolo">{{ _('Debiti totali') }}</span><strong class="neg">{{ debiti|euro }}</strong></div>
+  <div><span class="piccolo">{{ _('Crediti totali') }}</span><strong class="pos">{{ crediti|euro }}</strong></div>
+</div>
+<p class="aiuto">
+  {{ _('Ordina per:') }}
+  {% if ordine == 'saldo' %}<a href="{{ url_for('saldi') }}">{{ _('nome') }}</a> · <strong>{{ _('saldo') }}</strong>
+  {% else %}<strong>{{ _('nome') }}</strong> · <a href="{{ url_for('saldi', ordine='saldo') }}">{{ _('saldo') }}</a>{% endif %}
+</p>
+<ul class="lista">
+  {% for r in righe %}
+  <li class="{% if r.id == utente.id %}io{% endif %}{% if not r.attivo %} spento{% endif %}">
+    <div>
+      <div>{{ r|nome }}{% if r.speciale %} <span class="etichetta">{{ _('conto') }}</span>{% endif %}{% if not r.attivo %} <span class="etichetta">{{ _('non attivo') }}</span>{% endif %}</div>
+      {% set c = conteggi.get(r.id, {}) %}
+      <div class="piccolo">{% for p in prodotti if c.get(p.id) %}{{ p.emoji }} {{ c[p.id] }}{% if not loop.last %} · {% endif %}{% else %}{{ _('nessun acquisto') }}{% endfor %}</div>
+    </div>
+    <div class="importo {% if r.saldo < 0 %}neg{% elif r.saldo > 0 %}pos{% endif %}">{{ r.saldo|euro }}</div>
+  </li>
+  {% endfor %}
+</ul>
+<div class="azioni">
+  <a class="btn secondario" href="{{ url_for('export_excel') }}">⬇︎ {{ _('Scarica Excel') }}</a>
+  <a class="btn secondario" href="{{ url_for('movimenti', tutti=1) }}">{{ _('Tutti i movimenti') }}</a>
+</div>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

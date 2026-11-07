@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block contenuto %}
+<h1>{{ p|nome }}</h1>
+<p class="aiuto">{{ _('Saldo attuale:') }} <strong class="{% if saldo < 0 %}neg{% elif saldo > 0 %}pos{% endif %}">{{ saldo|euro }}</strong></p>
+<section class="scheda">
+  <form method="post" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label for="nome">{{ _('Nome') }}</label>
+    <input id="nome" name="nome" value="{{ p.nome }}" required>
+    <label for="cognome">{{ _('Cognome') }}</label>
+    <input id="cognome" name="cognome" value="{{ p.cognome }}">
+    <label for="email">{{ _("Email (per l'avviso del lunedì)") }}</label>
+    <input id="email" name="email" type="email" value="{{ p.email }}">
+    <label class="spunta"><input type="checkbox" name="attivo" value="1" {% if p.attivo %}checked{% endif %}> {{ _('Attivo') }}</label>
+    <label class="spunta"><input type="checkbox" name="admin" value="1" {% if p.admin %}checked{% endif %}> {{ _('Amministratore') }}</label>
+    <label class="spunta"><input type="checkbox" name="speciale" value="1" {% if p.speciale %}checked{% endif %}> {{ _('Conto senza accesso (es. Cassa)') }}</label>
+    <button type="submit" class="btn">{{ _('Salva') }}</button>
+  </form>
+</section>
+{% if not p.speciale %}
+<section class="scheda">
+  <h2>PIN</h2>
+  <p class="aiuto">{% if p.pin_hash %}{{ _('Se ha dimenticato il PIN o ha cambiato telefono, azzeralo: al prossimo accesso ne sceglierà uno nuovo.') }}{% else %}{{ _('Non ha ancora fatto il primo accesso.') }}{% endif %}</p>
+  {% if p.pin_hash %}
+  <form method="post" action="{{ url_for('admin_reset_pin', pid=p.id) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="btn secondario">{{ _('Azzera PIN') }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+<p class="aiuto centro"><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
+{% endblock %}

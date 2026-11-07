@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block contenuto %}
+<section class="scheda">
+  <h1>{{ _('Chi sei?') }}</h1>
+  <p class="aiuto">{{ _('Lo chiediamo solo la prima volta: poi questo telefono si ricorda di te.') }}</p>
+  <form method="post" action="{{ url_for('accedi') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label for="persona">{{ _('Il tuo nome') }}</label>
+    <select id="persona" name="persona_id" required>
+      <option value="">{{ _('— scegli —') }}</option>
+      {% for p in persone %}
+        <option value="{{ p.id }}" {% if p.id == selezionato %}selected{% endif %}>
+          {{ p|nome }}{% if not p.pin_hash %} ({{ _('primo accesso') }}){% endif %}
+        </option>
+      {% endfor %}
+    </select>
+    <label for="pin">PIN</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+           autocomplete="current-password" placeholder="{{ _('Lascia vuoto se è il primo accesso') }}">
+    <button type="submit" class="btn">{{ _('Entra') }}</button>
+  </form>
+  <p class="aiuto centro">{{ _("Non sei nell'elenco?") }} <a href="{{ url_for('registrati') }}">{{ _('Registrati') }}</a></p>
+</section>
+{% endblock %}

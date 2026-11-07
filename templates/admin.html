@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Amministrazione') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ _('Amministrazione') }}</h1>
+
+<div class="azioni">
+  <a class="btn secondario" href="{{ url_for('qr') }}">🖨 QR code</a>
+  <a class="btn secondario" href="{{ url_for('export_excel') }}">⬇︎ Excel</a>
+  <a class="btn secondario" href="{{ url_for('admin_backup') }}">💾 Backup</a>
+</div>
+
+<section class="scheda" id="manutenzione">
+  <h2>🔧 {{ _('Manutenzione della macchinetta') }}</h2>
+  <p class="aiuto">{{ _('Quando un lavoro è da fare, gli amministratori lo vedono in cima alla pagina principale. Con «Fatta» il conteggio riparte da oggi.') }}</p>
+  {% for m in manutenzioni %}
+  <form method="post" action="{{ url_for('admin_manutenzione', mid=m.id) }}" class="modulo prodotto-admin{% if not m.attivo %} spento{% endif %}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input name="nome" value="{{ m.nome }}" required aria-label="{{ _('Lavoro') }}" class="campo-lavoro">
+    <div class="riga-campi">
+      <span class="piccolo">{{ _('ogni') }}</span>
+      <input name="ogni_giorni" type="number" min="1" max="730" value="{{ m.ogni_giorni }}" class="campo-prezzo" aria-label="{{ _('Giorni') }}">
+      <span class="piccolo">{{ _('giorni') }}</span>
+    </div>
+    <div class="riga-campi">
+      <label class="piccolo" for="ultima{{ m.id }}">{{ _('Ultima volta') }}</label>
+      <input id="ultima{{ m.id }}" name="ultima" type="date" value="{{ m.ultima_data.isoformat() }}">
+    </div>
+    <p class="piccolo stato-manutenzione {% if m.da_fare and m.attivo %}neg{% endif %}">
+      {% if not m.attivo %}{{ _('Disattivato') }}
+      {% elif m.da_fare %}⚠️ {{ _('Da fare: scaduto da {n} giorni', n=-m.tra_giorni) }}
+      {% else %}{{ _('Prossima: tra {n} giorni', n=m.tra_giorni) }}{% endif %}
+      {% if m.da %} · {{ _('ultima fatta da {nome}', nome=m.da) }}{% endif %}
+    </p>
+    <div class="riga-campi tra">
+      <label class="spunta"><input type="checkbox" name="attivo" value="1" {% if m.attivo %}checked{% endif %}> {{ _('Attivo') }}</label>
+      <button type="submit" name="elimina" value="1" class="link-btn" data-conferma="{{ _('Eliminare questo promemoria e il suo storico?') }}">{{ _('Elimina') }}</button>
+      <button type="submit" class="btn">{{ _('Salva') }}</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('manutenzione_fatta', mid=m.id) }}" class="fatta-oggi">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="btn secondario">✔ {{ _('Fatta oggi: {nome}', nome=_(m.nome)) }}</button>
+  </form>
+  {% endfor %}
+  <details>
+    <summary>{{ _('Aggiungi un promemoria') }}</summary>
+    <form method="post" action="{{ url_for('admin_manutenzione_nuova') }}" class="modulo prodotto-admin">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input name="nome" placeholder="{{ _('es. Cambio filtro acqua') }}" required aria-label="{{ _('Lavoro') }}" class="campo-lavoro">
+      <div class="riga-campi">
+        <span class="piccolo">{{ _('ogni') }}</span>
+        <input name="ogni_giorni" type="number" min="1" max="730" value="30" class="campo-prezzo" aria-label="{{ _('Giorni') }}">
+        <span class="piccolo">{{ _('giorni') }}</span>
+      </div>
+      <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
+    </form>
+  </details>
+  {% if storico_manutenzioni %}
+  <h3>{{ _('Ultime manutenzioni fatte') }}</h3>
+  <ul class="elenco-stato">
+    {% for f in storico_manutenzioni %}<li>{{ f.ts|ora }} · {{ _(f.nome) }}{% if f.pn %} · {{ f.pn }} {{ f.pc }}{% endif %}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="scheda">
+  <h2>📢 {{ _('Avviso del lunedì') }}</h2>
+  <p class="aiuto">{{ _('Ogni lunedì (dalle 8:00) chi ha il saldo negativo vede in app il messaggio «{testo}».', testo=_('SALDA IL DEBITO, COMPRA IL CREDITO DI UN ALTRO UTENTE O COMPRA UNO DEI BENI')) }}{% if email_attiva %} {{ _('Lo riceve anche per email.') }}{% endif %}</p>
+  <ul class="elenco-stato">
+    <li>{{ _('In negativo adesso:') }} <strong>{{ n_negativo }}</strong> {% if n_senza_email %}({{ _("{n} senza email: vedono solo l'avviso in app", n=n_senza_email) }}){% endif %}</li>
+    <li>Email: {% if email_attiva %}<strong class="pos">{{ _('attiva') }}</strong>, {{ _('mittente') }} {{ smtp_user }}{% else %}<strong class="neg">{{ _('non configurata') }}</strong> ({{ _('vedi la guida, passo «Email del lunedì»') }}){% endif %}</li>
+    {% if esito %}<li>{{ _('Ultimo invio:') }} {{ esito.quando|ora }} · {{ _('{n} email inviate su {tot}', n=esito.inviati, tot=esito.con_email) }}{% if esito.errori %} · <span class="neg">{{ _('Errori: {errori}', errori=esito.errori|join('; ')) }}</span>{% endif %}</li>{% endif %}
+  </ul>
+  {% if email_attiva %}
+  <div class="riga-campi">
+    <form method="post" action="{{ url_for('admin_avvisi_prova') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button type="submit" class="btn secondario">{{ _('Email di prova a me') }}</button>
+    </form>
+    <form method="post" action="{{ url_for('admin_avvisi_invia') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button type="submit" class="btn secondario">{{ _('Invia adesso a tutti') }}</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
+<section class="scheda">
+  <h2>{{ _('Prodotti e prezzi') }}</h2>
+  <p class="aiuto">{{ _("Un nuovo prezzo vale solo per gli acquisti da ora in poi. Si può scegliere se paga chi lo prende oppure un conto comune (es. l'acqua per la macchinetta la paga il Conto Caffè).") }}</p>
+  {% for pr in prodotti %}
+  <form method="post" action="{{ url_for('admin_prodotto', prid=pr.id) }}" class="modulo prodotto-admin{% if not pr.attivo %} spento{% endif %}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="riga-campi">
+      <input name="emoji" value="{{ pr.emoji }}" class="campo-emoji" aria-label="Emoji">
+      <input name="nome" value="{{ pr.nome }}" required aria-label="{{ _('Nome prodotto') }}">
+      <input name="prezzo" inputmode="decimal" class="campo-prezzo" aria-label="{{ _('Prezzo in euro') }}"
+             value="{{ '%.2f'|format(pr.prezzo_cent / 100)|replace('.', ',') }}">
+    </div>
+    <select name="addebito_id" aria-label="{{ _('Chi paga') }}">
+      <option value="">{{ _('Paga chi lo prende') }}</option>
+      {% for c in conti %}<option value="{{ c.id }}" {% if c.id == pr.addebito_id %}selected{% endif %}>{{ _('Paga il {conto}', conto=c|nome) }}</option>{% endfor %}
+    </select>
+    <div class="riga-campi tra">
+      <label class="spunta"><input type="checkbox" name="attivo" value="1" {% if pr.attivo %}checked{% endif %}> {{ _('Attivo (visibile a tutti)') }}</label>
+      <button type="submit" class="btn">{{ _('Salva') }}</button>
+    </div>
+  </form>
+  {% endfor %}
+  <details>
+    <summary>{{ _('Aggiungi un prodotto') }}</summary>
+    <form method="post" action="{{ url_for('admin_prodotto_nuovo') }}" class="modulo prodotto-admin">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <div class="riga-campi">
+        <input name="emoji" placeholder="🍫" class="campo-emoji" aria-label="Emoji">
+        <input name="nome" placeholder="{{ _('Nome') }}" required aria-label="{{ _('Nome prodotto') }}">
+        <input name="prezzo" inputmode="decimal" placeholder="0,50" class="campo-prezzo" required aria-label="{{ _('Prezzo in euro') }}">
+      </div>
+      <select name="addebito_id" aria-label="{{ _('Chi paga') }}">
+        <option value="">{{ _('Paga chi lo prende') }}</option>
+        {% for c in conti %}<option value="{{ c.id }}">{{ _('Paga il {conto}', conto=c|nome) }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
+    </form>
+  </details>
+</section>
+
+<section class="scheda">
+  <h2>{{ _('Segna un acquisto per conto di qualcuno') }}</h2>
+  <p class="aiuto">{{ _('Per chi non ha il telefono, o per caricare qualcosa direttamente su un conto comune.') }}</p>
+  <form method="post" action="{{ url_for('admin_acquisto_per') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <select name="persona_id" required aria-label="{{ _('Persona') }}">
+      <option value="">{{ _('— persona o conto —') }}</option>
+      {% for r in righe if r.attivo %}<option value="{{ r.id }}">{{ r|nome }}</option>{% endfor %}
+    </select>
+    <div class="riga-campi">
+      <select name="prodotto_id" required aria-label="{{ _('Prodotto') }}">
+        {% for pr in prodotti if pr.attivo %}<option value="{{ pr.id }}">{{ pr.emoji }} {{ _(pr.nome) }}</option>{% endfor %}
+      </select>
+      <input name="qta" type="number" min="1" max="50" value="1" inputmode="numeric" class="campo-prezzo" aria-label="{{ _('Quantità') }}">
+    </div>
+    <button type="submit" class="btn">{{ _('Segna') }}</button>
+  </form>
+</section>
+
+<section class="scheda">
+  <h2>{{ _('Rettifica / versamento') }}</h2>
+  <p class="aiuto">{{ _('Per correggere un errore o registrare soldi versati a te o nella cassa. Importo positivo = più credito, negativo = più debito.') }}</p>
+  <form method="post" action="{{ url_for('admin_rettifica') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <select name="persona_id" required aria-label="{{ _('Persona') }}">
+      <option value="">{{ _('— persona o conto —') }}</option>
+      {% for r in righe %}<option value="{{ r.id }}">{{ r|nome }} ({{ r.saldo|euro }})</option>{% endfor %}
+    </select>
+    <input name="importo" inputmode="text" placeholder="{{ _('es. 10 oppure -2,40') }}" required aria-label="{{ _('Importo (€)') }}">
+    <input name="nota" maxlength="200" placeholder="{{ _('Motivo (obbligatorio)') }}" required aria-label="{{ _('Motivo (obbligatorio)') }}">
+    <button type="submit" class="btn">{{ _('Registra') }}</button>
+  </form>
+</section>
+
+<section class="scheda">
+  <h2>{{ _('Persone e conti') }}</h2>
+  <ul class="lista">
+    {% for r in righe %}
+    <li class="{% if not r.attivo %}spento{% endif %}">
+      <div>
+        <a href="{{ url_for('admin_persona', pid=r.id) }}">{{ r|nome }}</a>
+        {% if r.admin %}<span class="etichetta">admin</span>{% endif %}
+        {% if r.speciale %}<span class="etichetta">{{ _('conto') }}</span>{% elif not r.pin_hash %}<span class="etichetta">{{ _('mai entrato') }}</span>{% endif %}
+        {% if not r.attivo %}<span class="etichetta">{{ _('non attivo') }}</span>{% endif %}
+      </div>
+      <div class="importo {% if r.saldo < 0 %}neg{% elif r.saldo > 0 %}pos{% endif %}">{{ r.saldo|euro }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+  <h3>{{ _('Aggiungi persona o conto') }}</h3>
+  <form method="post" action="{{ url_for('admin_nuova_persona') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input name="nome" placeholder="{{ _('Nome') }}" required aria-label="{{ _('Nome') }}">
+    <input name="cognome" placeholder="{{ _('Cognome') }}" aria-label="{{ _('Cognome') }}">
+    <input name="saldo" placeholder="{{ _('Saldo iniziale (facoltativo, es. -3,50)') }}" aria-label="{{ _('Saldo iniziale') }}">
+    <label class="spunta"><input type="checkbox" name="speciale" value="1"> {{ _('Conto comune senza accesso (es. Cassa)') }}</label>
+    <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
+  </form>
+</section>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

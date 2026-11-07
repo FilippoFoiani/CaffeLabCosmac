@@ -1,0 +1,10 @@
+# Dati veri: database, chiave segreta, backup (mai su GitHub)
+dati/
+*.db
+secret_key
+.env
+
+# File temporanei di Python
+__pycache__/
+*.pyc
+.pytest_cache/

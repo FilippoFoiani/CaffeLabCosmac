@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Profilo') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ _('Profilo') }}</h1>
+<section class="scheda">
+  <p><strong>{{ utente|nome }}</strong></p>
+  <form method="post" action="{{ url_for('profilo') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
+           placeholder="nome.cognome@studenti.unipg.it" value="{{ utente.email }}">
+    <label class="spunta"><input type="checkbox" name="avvisi_email" value="1" {% if utente.avvisi_email %}checked{% endif %}>
+      {{ _("Mandami per email l'avviso del lunedì quando il mio saldo è negativo") }}</label>
+    {% if not email_attiva %}<p class="aiuto">{{ _("Per ora l'amministratore non ha ancora attivato le email: l'avviso lo vedi comunque qui nell'app.") }}</p>{% endif %}
+    <button type="submit" class="btn">{{ _('Salva') }}</button>
+  </form>
+  <p class="aiuto">{{ _('Lingua') }}: <a href="{{ url_for('cambia_lingua', codice='it') }}">Italiano</a> · <a href="{{ url_for('cambia_lingua', codice='en') }}">English</a></p>
+</section>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

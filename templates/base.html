@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="{{ lingua }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#6f4e37">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ nome_app }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icona-192.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icona-180.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='stile.css') }}">
+  <title>{% block titolo %}{{ nome_app }}{% endblock %}</title>
+</head>
+<body>
+  <header class="barra">
+    <a href="{{ url_for('home') }}" class="logo">☕ {{ nome_app }}</a>
+    <div class="barra-destra">
+      <nav class="lingue" aria-label="{{ _('Lingua') }}">
+        <a href="{{ url_for('cambia_lingua', codice='it') }}" class="{% if lingua == 'it' %}attiva{% endif %}" lang="it">IT</a>
+        <a href="{{ url_for('cambia_lingua', codice='en') }}" class="{% if lingua == 'en' %}attiva{% endif %}" lang="en">EN</a>
+      </nav>
+      {% if utente %}
+      <form method="post" action="{{ url_for('esci') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="link-btn" type="submit">{{ _('Esci') }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </header>
+  <main>
+    {% with messaggi = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messaggi %}
+        <div class="avviso {{ cat }}" role="status">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block contenuto %}{% endblock %}
+  </main>
+  <script>
+    // Chiede conferma prima delle azioni irreversibili
+    document.querySelectorAll('[data-conferma]').forEach(function (el) {
+      el.addEventListener('click', function (e) { if (!confirm(el.dataset.conferma)) { e.preventDefault(); } });
+    });
+    // Evita il doppio invio dei moduli (doppio tocco)
+    document.querySelectorAll('form').forEach(function (f) {
+      f.addEventListener('submit', function () {
+        f.querySelectorAll('button[type=submit]').forEach(function (b) {
+          setTimeout(function () { b.disabled = true; }, 0);
+        });
+      });
+    });
+  </script>
+  {% block script %}{% endblock %}
+</body>
+</html>

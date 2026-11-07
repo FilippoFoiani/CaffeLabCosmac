@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block contenuto %}
+<section class="scheda">
+  <h1>{{ _('Nuovo account') }}</h1>
+  <p class="aiuto">{{ _("Solo se il tuo nome non è già nell'elenco della pagina di accesso.") }}</p>
+  <form method="post" action="{{ url_for('registrati') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label for="nome">{{ _('Nome') }}</label>
+    <input id="nome" name="nome" required autocomplete="given-name" value="{{ nome or '' }}">
+    <label for="cognome">{{ _('Cognome') }}</label>
+    <input id="cognome" name="cognome" required autocomplete="family-name" value="{{ cognome or '' }}">
+    <label for="email">Email <span class="aiuto">{{ _("(facoltativa: serve per l'avviso del lunedì)") }}</span></label>
+    <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
+           placeholder="nome.cognome@studenti.unipg.it" value="{{ email or '' }}">
+    <label for="pin">{{ _('PIN (4–8 cifre)') }}</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+           minlength="4" maxlength="8" required autocomplete="new-password">
+    <label for="pin2">{{ _('Ripeti il PIN') }}</label>
+    <input id="pin2" name="pin2" type="password" inputmode="numeric" pattern="[0-9]*"
+           minlength="4" maxlength="8" required autocomplete="new-password">
+    <button type="submit" class="btn">{{ _('Crea account') }}</button>
+  </form>
+  <p class="aiuto centro"><a href="{{ url_for('accedi') }}">← {{ _("Torna all'accesso") }}</a></p>
+</section>
+{% endblock %}

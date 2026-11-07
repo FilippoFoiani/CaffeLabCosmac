@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR code – {{ nome_app }}</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #2b1d14;
+           text-align: center; margin: 0; padding: 24px; }
+    h1 { font-size: 34px; margin: 10px 0 2px; }
+    .en { color: #6f4e37; font-style: italic; }
+    h1 + .en { font-size: 20px; margin: 0 0 6px; }
+    .sub { font-size: 18px; color: #6f4e37; margin: 8px 0 14px; }
+    .qr svg { width: 88mm; height: 88mm; max-width: 90vw; max-height: 90vw; }
+    .url { font-size: 14px; color: #555; word-break: break-all; margin: 6px 0 18px; }
+    ol { display: inline-block; text-align: left; font-size: 17px; line-height: 1.45; margin: 0; }
+    ol li { margin-bottom: 6px; }
+    ol .en { display: block; font-size: 14px; }
+    .nota { font-size: 14px; color: #555; margin-top: 16px; }
+    .stampa { margin-top: 24px; padding: 12px 22px; font-size: 16px; border-radius: 10px; border: 0;
+              background: #6f4e37; color: #fff; cursor: pointer; }
+    @media print { .stampa, .torna { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>☕ 💧 Hai preso qualcosa?</h1>
+  <p class="en">Did you take something?</p>
+  <p class="sub">Caffè, acqua o acqua per la macchinetta: inquadra il codice e segnalo qui<br>
+    <span class="en">Coffee, water or machine water: scan the code and log it here</span></p>
+  <div class="qr">{{ svg|safe }}</div>
+  <div class="url">{{ indirizzo }}</div>
+  <ol>
+    <li>Inquadra il QR con la fotocamera del telefono
+      <span class="en">Scan the QR code with your phone camera</span></li>
+    <li>Solo la prima volta: scegli il tuo nome e un PIN
+      <span class="en">First time only: pick your name and a PIN</span></li>
+    <li>Tocca <strong>+</strong> su quello che hai preso e poi <strong>Conferma</strong>. Fatto!
+      <span class="en">Tap <strong>+</strong> on what you took, then <strong>Confirm</strong>. Done!</span></li>
+  </ol>
+  <p class="nota">Consiglio: aggiungi la pagina alla schermata Home, così la apri con un tocco.<br>
+    <span class="en">Tip: add the page to your Home screen to open it with one tap. Switch to English with “EN” at the top.</span><br>
+    {% for pr in prodotti %}{{ pr.emoji }} {{ pr.nome }} {{ pr.prezzo_cent|euro(false) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <button class="stampa" onclick="window.print()">Stampa / Print</button>
+  <p class="torna"><a href="{{ url_for('admin') if utente and utente.admin else url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+</body>
+</html>

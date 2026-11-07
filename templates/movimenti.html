@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Movimenti') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{% if tutti %}{{ _('Tutti i movimenti') }}{% else %}{{ _('I miei movimenti') }}{% endif %}</h1>
+<p class="aiuto">
+  {% if tutti %}<a href="{{ url_for('movimenti') }}">{{ _('Solo i miei') }}</a>
+  {% else %}<a href="{{ url_for('movimenti', tutti=1) }}">{{ _('Vedi quelli di tutti') }}</a>{% endif %}
+  · {{ _('ultimi 300') }}
+</p>
+{% if not righe %}<p class="aiuto">{{ _('Ancora nessun movimento.') }}</p>{% endif %}
+<ul class="lista">
+  {% for m in righe %}
+  <li class="{% if m.annullato %}annullato{% endif %}">
+    <div>
+      {% if tutti %}<div class="piccolo forte">{{ nomi[m.persona_id] }}</div>{% endif %}
+      <div>{{ m|descrizione }}</div>
+      <div class="piccolo">
+        {{ m.ts|ora }}
+        {% if m.creato_da and m.creato_da != m.persona_id %} · {{ _('registrato da {nome}', nome=nomi[m.creato_da]) }}{% endif %}
+        {% if m.annullato %} · {{ _('annullato') }}{% endif %}
+      </div>
+      {% if m.id in annullabili %}
+      <form method="post" action="{{ url_for('annulla', mid=m.id) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="link-btn" type="submit">{{ _('Annulla') }}</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="importo {% if m.importo_cent < 0 %}neg{% else %}pos{% endif %}">{{ m.importo_cent|euro }}</div>
+  </li>
+  {% endfor %}
+</ul>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

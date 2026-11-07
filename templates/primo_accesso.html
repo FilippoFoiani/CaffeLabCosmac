@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block contenuto %}
+<section class="scheda">
+  <h1>{{ _('Primo accesso') }}</h1>
+  <p class="aiuto">{{ _('Controlla nome e cognome e scegli un PIN di 4–8 cifre. Ti servirà solo se cambi telefono o esci.') }}</p>
+  <form method="post" action="{{ url_for('primo_accesso') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="persona_id" value="{{ p.id }}">
+    <label for="nome">{{ _('Nome') }}</label>
+    <input id="nome" name="nome" required autocomplete="given-name"
+           value="{{ nome if nome is defined else p.nome }}">
+    <label for="cognome">{{ _('Cognome') }}</label>
+    <input id="cognome" name="cognome" required autocomplete="family-name"
+           value="{{ cognome if cognome is defined else p.cognome }}">
+    <label for="email">Email <span class="aiuto">{{ _("(facoltativa: serve per l'avviso del lunedì)") }}</span></label>
+    <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
+           placeholder="nome.cognome@studenti.unipg.it" value="{{ email or (p.email if p is defined else '') }}">
+    <label for="pin">{{ _('Nuovo PIN') }}</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+           minlength="4" maxlength="8" required autocomplete="new-password">
+    <label for="pin2">{{ _('Ripeti il PIN') }}</label>
+    <input id="pin2" name="pin2" type="password" inputmode="numeric" pattern="[0-9]*"
+           minlength="4" maxlength="8" required autocomplete="new-password">
+    <button type="submit" class="btn">{{ _('Attiva il mio account') }}</button>
+  </form>
+  <p class="aiuto centro"><a href="{{ url_for('accedi') }}">← {{ _('Non sono {nome}', nome=p.nome) }}</a></p>
+</section>
+{% endblock %}

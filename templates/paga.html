@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Pagamenti') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ _('Pagamenti tra persone') }}</h1>
+<form method="post" action="{{ url_for('paga') }}" class="modulo" id="modulo-paga"
+      data-t-dopo="{{ _("Dopo l'operazione: tu {mio}, {nome} passa da {da} a {a}.") }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input type="hidden" name="nonce" value="{{ nonce }}">
+
+  <label class="scelta">
+    <input type="radio" name="verso" value="dato" {% if form.get('verso', 'dato') == 'dato' %}checked{% endif %}>
+    <span><strong>{{ _('Ho dato dei soldi a qualcuno') }}</strong>
+      <small>{{ _('Es. hai dato 5 € in contanti a chi è in credito: il tuo saldo sale, il suo scende.') }}</small></span>
+  </label>
+  <label class="scelta">
+    <input type="radio" name="verso" value="accollo" {% if form.get('verso') == 'accollo' %}checked{% endif %}>
+    <span><strong>{{ _('Mi prendo il debito di qualcuno') }}</strong>
+      <small>{{ _('Es. ti accolli i 4,18 € di un collega: il suo saldo sale, il tuo scende.') }}</small></span>
+  </label>
+
+  <label for="controparte">{{ _('Persona') }}</label>
+  <select id="controparte" name="controparte" required>
+    <option value="">{{ _('— scegli —') }}</option>
+    {% for p in altri %}
+      <option value="{{ p.id }}" data-saldo="{{ p.saldo }}" data-nome="{{ p|nome }}"
+        {% if form.get('controparte')|string == p.id|string %}selected{% endif %}>
+        {{ p|nome }} ({{ p.saldo|euro }})
+      </option>
+    {% endfor %}
+  </select>
+
+  <label for="importo">{{ _('Importo (€)') }}</label>
+  <input id="importo" name="importo" inputmode="decimal" placeholder="{{ _('es. 5 oppure 2,50') }}" required
+         value="{{ form.get('importo', '') }}">
+
+  <label for="nota">{{ _('Nota (facoltativa)') }}</label>
+  <input id="nota" name="nota" maxlength="200" value="{{ form.get('nota', '') }}">
+
+  <p class="anteprima" id="anteprima" hidden></p>
+  <button type="submit" class="btn">{{ _('Registra') }}</button>
+</form>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  (function () {
+    var f = document.getElementById('modulo-paga');
+    var out = document.getElementById('anteprima');
+    function euro(c) {
+      var s = (Math.abs(c) / 100).toFixed(2).replace('.', ',') + ' €';
+      return (c > 0 ? '+' : c < 0 ? '−' : '') + s;
+    }
+    function aggiorna() {
+      var verso = f.querySelector('input[name=verso]:checked');
+      var sel = f.controparte.options[f.controparte.selectedIndex];
+      var imp = Math.round(parseFloat((f.importo.value || '').replace(',', '.')) * 100);
+      if (!verso || !sel || !sel.value || !(imp > 0)) { out.hidden = true; return; }
+      var saldoAltro = parseInt(sel.dataset.saldo, 10);
+      var segno = verso.value === 'dato' ? 1 : -1;
+      out.textContent = f.dataset.tDopo
+        .replace('{mio}', euro(segno * imp))
+        .replace('{nome}', sel.dataset.nome)
+        .replace('{da}', euro(saldoAltro))
+        .replace('{a}', euro(saldoAltro - segno * imp));
+      out.hidden = false;
+    }
+    f.addEventListener('input', aggiorna);
+    f.addEventListener('change', aggiorna);
+    aggiorna();
+  })();
+</script>
+{% endblock %}
