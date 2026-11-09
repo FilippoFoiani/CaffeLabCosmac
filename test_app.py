@@ -749,6 +749,47 @@ def test_metodo_di_pagamento_nella_scheda():
     assert "giulia@example.com" in scheda and "paypal.me/" not in scheda and "IT60" not in scheda
 
 
+def test_statistiche_dei_consumi():
+    """Issue #4: consumi per giorno/settimana/mese/anno, di tutti o di una persona, visibili a tutti."""
+    from datetime import date, datetime, timedelta, timezone
+    luca = app.test_client()
+    entra(luca, "Luca")
+    lid, caffe, acqua_m = id_di("Luca"), prod("caffe"), prod("acqua_macchinetta")
+    # dalla home: 1 caffè (pagato da Luca) e 1 acqua macchinetta (pagata dal Conto Caffè)
+    tok, html = csrf(luca, "/")
+    luca.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{caffe}": "1", f"q{acqua_m}": "1"})
+    # caffè di altri giorni, scritti direttamente con la data; uno annullato non conta
+    adesso = datetime.now(timezone.utc)
+    with app.app_context():
+        for quando, qta, annullato in ((adesso - timedelta(days=2), 2, 0), (adesso - timedelta(days=40), 3, 0),
+                                       (adesso.replace(year=adesso.year - 1, month=6, day=15), 4, 0),
+                                       (adesso - timedelta(days=1), 5, 1)):
+            modulo.db().execute("INSERT INTO movimenti (ts, persona_id, tipo, importo_cent, qta, prodotto_id, "
+                                "creato_da, annullato) VALUES (?,?,?,?,?,?,?,?)",
+                                (quando.isoformat(timespec="seconds"), lid, "acquisto", -30 * qta, qta, caffe,
+                                 lid, annullato))
+        modulo.db().commit()
+        dati = modulo.consumi(lid)
+        assert sorted(q for _g, p, q in dati if p == caffe) == [1, 2, 3, 4]
+        assert [q for _g, p, q in dati if p == acqua_m] == [1]      # conta per Luca, non per il conto
+        conto = modulo.db().execute("SELECT addebito_id FROM prodotti WHERE id=?", (acqua_m,)).fetchone()[0]
+        assert all(p != acqua_m for _g, p, _q in modulo.consumi(conto))
+    # periodi: inizio della settimana (lunedì), mese prima a cavallo d'anno
+    assert modulo.inizio_periodo(date(2026, 11, 12), "settimana") == date(2026, 11, 9)
+    assert modulo.periodo_prima(date(2026, 1, 1), "mese") == date(2025, 12, 1)
+    # la pagina: righe per periodo, i totali di oggi, e chiunque può vedere i consumi di Luca
+    nick = app.test_client()
+    entra(nick, "Nick")
+    for periodo, righe in (("giorno", 14), ("settimana", 12), ("mese", 12)):
+        pagina = nick.get(f"/statistiche?periodo={periodo}&persona={lid}").get_data(as_text=True)
+        assert pagina.count('class="stat-etichetta"') == righe
+    pagina = nick.get(f"/statistiche?periodo=anno&persona={lid}").get_data(as_text=True)
+    assert f">{adesso.year - 1}<" in pagina and f">{adesso.year}<" in pagina
+    assert "☕ 1 · 🫗 1" in re.sub(r"<[^>]+>", "", pagina)            # riquadro «Oggi»
+    assert "Statistiche" in nick.get("/statistiche").get_data(as_text=True)
+    assert app.test_client().get("/statistiche").status_code == 302
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

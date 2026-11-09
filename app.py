@@ -1286,6 +1286,104 @@ def come_funziona():
 
 
 # --------------------------------------------------------------------------
+# Statistiche dei consumi: visibili a tutti quelli che hanno fatto l'accesso
+# --------------------------------------------------------------------------
+PERIODI = ("giorno", "settimana", "mese", "anno")
+QUANTI_PERIODI = {"giorno": 14, "settimana": 12, "mese": 12}   # gli anni: dal primo con dati
+
+
+def consumi(persona_id=None):
+    """[(giorno locale, prodotto_id, quantità)] degli acquisti non annullati, di tutti o di una persona.
+    Un prodotto pagato da un conto comune (es. acqua macchinetta) conta per chi l'ha preso."""
+    righe = db().execute("""
+        SELECT ts, prodotto_id, qta FROM (
+            SELECT m.ts, m.prodotto_id, m.qta,
+                   CASE WHEN p.speciale = 1 AND m.nota LIKE 'presa da %' THEN m.creato_da
+                        ELSE m.persona_id END AS chi
+            FROM movimenti m JOIN persone p ON p.id = m.persona_id
+            WHERE m.tipo = 'acquisto' AND m.annullato = 0 AND m.qta > 0)
+        WHERE ? IS NULL OR chi = ?""", (persona_id, persona_id)).fetchall()
+    return [(da_iso(r["ts"]).astimezone(TZ).date(), r["prodotto_id"], r["qta"]) for r in righe]
+
+
+def inizio_periodo(giorno, periodo):
+    """Primo giorno del periodo (giorno, settimana da lunedì, mese, anno) che contiene «giorno»."""
+    if periodo == "settimana":
+        return giorno - timedelta(days=giorno.weekday())
+    if periodo == "mese":
+        return giorno.replace(day=1)
+    if periodo == "anno":
+        return giorno.replace(month=1, day=1)
+    return giorno
+
+
+def periodo_prima(inizio, periodo):
+    if periodo == "settimana":
+        return inizio - timedelta(days=7)
+    if periodo == "mese":
+        return (inizio - timedelta(days=1)).replace(day=1)
+    if periodo == "anno":
+        return inizio.replace(year=inizio.year - 1)
+    return inizio - timedelta(days=1)
+
+
+def etichetta_periodo(inizio, periodo, oggi):
+    if periodo == "giorno":
+        if inizio == oggi:
+            return _("oggi")
+        return _("ieri") if inizio == oggi - timedelta(days=1) else f"{inizio:%d/%m}"
+    if periodo == "settimana":
+        if inizio == inizio_periodo(oggi, "settimana"):
+            return _("questa settimana")
+        return _("dal {data}", data=f"{inizio:%d/%m}")
+    if periodo == "mese":
+        return f"{inizio:%m/%Y}"
+    return str(inizio.year)
+
+
+@app.get("/statistiche")
+@login_richiesto
+def statistiche():
+    periodo = request.args.get("periodo")
+    periodo = periodo if periodo in PERIODI else "giorno"
+    chi = persona(request.args.get("persona", type=int) or 0)
+    if chi and chi["speciale"]:
+        chi = None
+    dati = consumi(chi["id"] if chi else None)
+    oggi = datetime.now(TZ).date()
+    quanti = QUANTI_PERIODI.get(periodo) or \
+        oggi.year - min((giorno.year for giorno, _p, _q in dati), default=oggi.year) + 1
+    inizi = [inizio_periodo(oggi, periodo)]          # dal più recente
+    while len(inizi) < quanti:
+        inizi.append(periodo_prima(inizi[-1], periodo))
+    conteggi = {i: {} for i in inizi}
+    attuali = {p: {} for p in PERIODI}               # oggi, questa settimana, questo mese, quest'anno
+    ultimi_30 = {}
+    for giorno, prid, qta in dati:
+        k = inizio_periodo(giorno, periodo)
+        if k in conteggi:
+            conteggi[k][prid] = conteggi[k].get(prid, 0) + qta
+        for p in PERIODI:
+            if inizio_periodo(giorno, p) == inizio_periodo(oggi, p):
+                attuali[p][prid] = attuali[p].get(prid, 0) + qta
+        if 0 <= (oggi - giorno).days < 30:
+            ultimi_30[prid] = ultimi_30.get(prid, 0) + qta
+    righe = [{"etichetta": etichetta_periodo(i, periodo, oggi), "conteggi": conteggi[i],
+              "totale": sum(conteggi[i].values())} for i in inizi]
+    tutti_i_prodotti = prodotti(solo_attivi=False)
+    usati = {prid for _g, prid, _q in dati}
+    return render_template(
+        "statistiche.html", periodo=periodo, chi=chi, righe=righe, attuali=attuali,
+        massimo=max(r["totale"] for r in righe) or 1, ci_sono_dati=bool(dati),
+        media={prid: f"{n / 30:.1f}".replace(".", ",") for prid, n in ultimi_30.items()},
+        prodotti=[pr for pr in tutti_i_prodotti if pr["attivo"] or pr["id"] in usati],
+        # il colore segue il prodotto (posizione fissa nell'elenco), non cambia con i filtri
+        colori={pr["id"]: min(i, 7) for i, pr in enumerate(tutti_i_prodotti)},
+        nomi_prodotti={pr["id"]: nome_prodotto(pr) for pr in tutti_i_prodotti},
+        persone=[p for p in elenco_saldi() if not p["speciale"]])
+
+
+# --------------------------------------------------------------------------
 # Avviso del lunedì via email
 # --------------------------------------------------------------------------
 def email_configurata():

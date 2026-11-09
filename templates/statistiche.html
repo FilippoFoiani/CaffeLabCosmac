@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Statistiche') }} – {{ nome_app }}{% endblock %}
+
+{# "☕ 3 · 💧 1" per un dizionario {prodotto_id: quantità}; "0" se vuoto #}
+{% macro numeri(c) -%}
+  {% for pr in prodotti if c.get(pr.id) %}<span class="unito">{{ pr.emoji }} {{ c[pr.id] }}</span>{% if not loop.last %} · {% endif %}{% else %}0{% endfor %}
+{%- endmacro %}
+
+{% block contenuto %}
+<h1>📈 {{ _('Statistiche') }}</h1>
+
+<form method="get" action="{{ url_for('statistiche') }}" class="modulo">
+  <input type="hidden" name="periodo" value="{{ periodo }}">
+  <label for="persona">{{ _('Consumi di') }}</label>
+  <select id="persona" name="persona" data-invia-subito>
+    <option value="">{{ _('Tutti') }}</option>
+    {% for p in persone %}
+    <option value="{{ p.id }}" {% if chi and chi.id == p.id %}selected{% endif %}>{{ p|nome }}{% if p.id == utente.id %} ({{ _('tu') }}){% endif %}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit" class="btn">{{ _('Mostra') }}</button></noscript>
+</form>
+{% if not chi or chi.id != utente.id %}
+<p class="aiuto"><a href="{{ url_for('statistiche', periodo=periodo, persona=utente.id) }}">👤 {{ _('Vedi i miei consumi') }}</a></p>
+{% endif %}
+
+<div class="riassunto stat-riassunto">
+  {% for p, titolo in [('giorno', _('Oggi')), ('settimana', _('Questa settimana')), ('mese', _('Questo mese')), ('anno', _("Quest'anno"))] %}
+  <div><span class="piccolo">{{ titolo }}</span><strong>{{ numeri(attuali[p]) }}</strong></div>
+  {% endfor %}
+</div>
+{% if media %}
+<p class="aiuto">{{ _('Media al giorno negli ultimi 30 giorni:') }}
+  {% for pr in prodotti if media.get(pr.id) %}<span class="unito">{{ pr.emoji }} {{ media[pr.id] }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{% endif %}
+
+<nav class="schede-periodo" aria-label="{{ _('Periodo') }}">
+  {% for p, nome in [('giorno', _('Giorni')), ('settimana', _('Settimane')), ('mese', _('Mesi')), ('anno', _('Anni'))] %}
+  <a href="{{ url_for('statistiche', periodo=p, persona=chi.id if chi else None) }}" {% if p == periodo %}class="attiva" aria-current="page"{% endif %}>{{ nome }}</a>
+  {% endfor %}
+</nav>
+
+{% if not ci_sono_dati %}
+<p class="aiuto">{{ _("Ancora nessun consumo segnato nell'app.") }}</p>
+{% else %}
+<div class="legenda">
+  {% for pr in prodotti %}<span><i class="serie serie-{{ colori[pr.id] }}"></i>{{ pr.emoji }} {{ nomi_prodotti[pr.id] }}</span>{% endfor %}
+</div>
+<ul class="lista stat-righe">
+  {% for r in righe %}
+  <li>
+    <div class="stat-etichetta">{{ r.etichetta }}</div>
+    <div class="stat-barra">
+      {% for pr in prodotti %}{% set n = r.conteggi.get(pr.id, 0) %}{% if n %}<span class="seg serie-{{ colori[pr.id] }}" style="width: {{ (100 * n / massimo)|round(2) }}%" title="{{ nomi_prodotti[pr.id] }}: {{ n }}"></span>{% endif %}{% endfor %}
+    </div>
+    <div class="stat-numeri piccolo">{{ numeri(r.conteggi) }}</div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+<p class="aiuto">{{ _("Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. L'acqua per la macchinetta conta per chi l'ha presa, anche se la paga il Conto Caffè.") }}</p>
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  document.querySelectorAll('[data-invia-subito]').forEach(function (s) {
+    s.addEventListener('change', function () { s.form.submit(); });
+  });
+</script>
+{% endblock %}

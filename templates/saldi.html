@@ -26,6 +26,7 @@
 <div class="azioni">
   <a class="btn secondario" href="{{ url_for('export_excel') }}">⬇︎ {{ _('Scarica Excel') }}</a>
   <a class="btn secondario" href="{{ url_for('movimenti', tutti=1) }}">{{ _('Tutti i movimenti') }}</a>
+  <a class="btn secondario" href="{{ url_for('statistiche') }}">📈 {{ _('Statistiche') }}</a>
 </div>
 <p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}
