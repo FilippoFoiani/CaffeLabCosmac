@@ -400,9 +400,12 @@ def test_come_funziona_senza_accesso():
     c = app.test_client()
     html = c.get("/come-funziona").get_data(as_text=True)
     assert "Come rientrare dal debito" in html and "Pulizia" in html
+    # come impostare il profilo: email e metodo di pagamento
+    assert "Imposta il tuo profilo" in html and "PayPal" in html and "IBAN" in html
+    assert "Apri il tuo profilo" not in html                      # il pulsante solo per chi ha fatto l'accesso
     import html as _h
     en = _h.unescape(c.get("/come-funziona", headers={"Accept-Language": "en"}).get_data(as_text=True))
-    assert "How to get out of debt" in en and "Keep your debt low" in en
+    assert "How to get out of debt" in en and "Keep your debt low" in en and "Set up your profile" in en
 
 
 class FintoSMTP:

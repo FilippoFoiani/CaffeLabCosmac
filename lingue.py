@@ -531,18 +531,36 @@ EN = {
         "Negative balance",
     "debito: hai consumato più di quello che hai pagato.":
         "debt: you have used more than you have paid.",
-    "Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune del caffè.":
-        "Coffee and water share one balance. Water for the machine is paid by the shared coffee account.",
+    "Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune «Macchinetta del caffè».":
+        "Coffee and water share one balance. Water for the machine is paid by the shared “Coffee machine” account (Macchinetta del caffè).",
     "Saldi e movimenti sono visibili a tutti, come sul foglio appeso al muro.":
         "Balances and transactions are visible to everyone, just like on the sheet on the wall.",
     "Come rientrare dal debito":
         "How to get out of debt",
     "metti i soldi nella cassa e registralo in «Pagamenti tra persone» → «Ho dato dei soldi a qualcuno» → Cassa. Conta quando un amministratore conferma.":
         "put the money in the cash box and record it in “Payments between people” → “I gave money to someone” → Cash box. It counts once an administrator confirms.",
-    "dai i soldi a chi è in credito (lo vedi in «Saldi di tutti») e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.":
-        "give the money to someone in credit (see “Everyone's balances”) and record it the same way, choosing that person. It counts once they confirm they received it.",
-    "compra caffè, cialde, acqua o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Il credito arriva quando un amministratore approva.":
-        "buy coffee, pods, water or anything else for the group and record it in “I bought for the group”, with a photo of the receipt. The credit arrives once an administrator approves.",
+    "dai i soldi a chi è in credito (lo vedi in «Saldi di tutti»: tocca il suo nome per vedere il suo PayPal o IBAN) e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.":
+        "give the money to someone in credit (see “Everyone's balances”: tap their name to see their PayPal or IBAN) and record it the same way, choosing that person. It counts once they confirm they received it.",
+    "compra caffè, cialde, bottiglie, bicchierini o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Per cialde, bottiglie e bicchierini scrivi quanti pezzi e quanto li hai pagati. Il credito arriva quando un amministratore approva.":
+        "buy coffee, pods, bottles, cups or anything else for the group and record it in “I bought for the group”, with a photo of the receipt. For pods, bottles and cups enter how many pieces and how much you paid. The credit arrives once an administrator approves.",
+    # --- come funziona: il profilo ---
+    "Imposta il tuo profilo (fallo subito)": "Set up your profile (do it now)",
+    "Nella pagina principale tocca «👤 Profilo ed email».": "On the home page tap “👤 Profile and email”.",
+    "Email": "Email",
+    "scrivi il tuo indirizzo. Ogni lunedì, se il saldo è negativo, ti arriva l'avviso anche per email. Se non vuoi l'email togli la spunta: l'avviso lo vedi comunque nell'app.":
+        "enter your address. Every Monday, if your balance is negative, you also get the reminder by email. If you don't want the email, untick the box: you still see the reminder in the app.",
+    "serve a chi deve darti dei soldi. Puoi mettere uno o tutti e due:": "this is for whoever owes you money. You can add one or both:",
+    "il tuo nome di paypal.me, cioè quello dopo «paypal.me/» (es. mariorossi). Va bene anche incollare il link intero o scrivere l'email del conto PayPal.":
+        "your paypal.me name, i.e. what comes after “paypal.me/” (e.g. mariorossi). You can also paste the whole link or enter the email of your PayPal account.",
+    "anche con spazi e minuscole. L'app controlla le cifre: se c'è un errore di battitura non lo salva e te lo dice.":
+        "spaces and lowercase are fine. The app checks the digits: if there's a typo it won't save it and tells you.",
+    "Tocca «Salva». Con «Vedi la tua scheda» controlli cosa vedono gli altri.": "Tap “Save”. With “See your card” you check what others see.",
+    "PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda (toccando il tuo nome in «Saldi di tutti» o scegliendoti in «Pagamenti tra persone»). Non compaiono nella lista dei saldi né nell'Excel. Per toglierli svuota il campo e salva.":
+        "PayPal and IBAN are only visible to people logged in to the app, on your card (by tapping your name in “Everyone's balances” or choosing you in “Payments between people”). They don't appear in the balance list or in the Excel file. To remove them, empty the field and save.",
+    "Apri il tuo profilo": "Open your profile",
+    "Come pago chi è in credito?": "How do I pay someone in credit?",
+    "Tocca il suo nome in «Saldi di tutti»: nella scheda trovi il suo PayPal o IBAN. Dopo averlo pagato registralo in «Pagamenti tra persone».":
+        "Tap their name in “Everyone's balances”: their card shows their PayPal or IBAN. After paying, record it in “Payments between people”.",
     "Tieni basso il debito":
         "Keep your debt low",
     "Caffè e acqua li ricompra chi anticipa i soldi: ogni euro di debito è un euro che un collega ha messo di tasca sua. Salda presto!":

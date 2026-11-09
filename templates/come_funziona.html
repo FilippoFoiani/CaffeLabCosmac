@@ -14,12 +14,29 @@
   <p class="aiuto">{% for pr in prodotti %}{{ pr.emoji }} {{ _(pr.nome) }} {{ pr.prezzo_cent|euro(false) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
 </section>
 
+<section class="scheda" id="profilo">
+  <h2>👤 {{ _('Imposta il tuo profilo (fallo subito)') }}</h2>
+  <ol>
+    <li>{{ _('Nella pagina principale tocca «👤 Profilo ed email».') }}</li>
+    <li><strong>{{ _('Email') }}</strong>: {{ _("scrivi il tuo indirizzo. Ogni lunedì, se il saldo è negativo, ti arriva l'avviso anche per email. Se non vuoi l'email togli la spunta: l'avviso lo vedi comunque nell'app.") }}</li>
+    <li><strong>{{ _('Come vuoi essere pagato') }}</strong>: {{ _('serve a chi deve darti dei soldi. Puoi mettere uno o tutti e due:') }}
+      <ul>
+        <li><strong>PayPal</strong>: {{ _("il tuo nome di paypal.me, cioè quello dopo «paypal.me/» (es. mariorossi). Va bene anche incollare il link intero o scrivere l'email del conto PayPal.") }}</li>
+        <li><strong>IBAN</strong>: {{ _("anche con spazi e minuscole. L'app controlla le cifre: se c'è un errore di battitura non lo salva e te lo dice.") }}</li>
+      </ul>
+    </li>
+    <li>{{ _('Tocca «Salva». Con «Vedi la tua scheda» controlli cosa vedono gli altri.') }}</li>
+  </ol>
+  <p class="aiuto">🔒 {{ _("PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda (toccando il tuo nome in «Saldi di tutti» o scegliendoti in «Pagamenti tra persone»). Non compaiono nella lista dei saldi né nell'Excel. Per toglierli svuota il campo e salva.") }}</p>
+  {% if utente %}<a class="btn" href="{{ url_for('profilo') }}">👤 {{ _('Apri il tuo profilo') }}</a>{% endif %}
+</section>
+
 <section class="scheda">
   <h2>💶 {{ _('Il tuo saldo') }}</h2>
   <ul>
     <li><strong class="pos">{{ _('Saldo positivo') }}</strong> = {{ _('credito: hai messo più soldi di quelli che hai consumato.') }}</li>
     <li><strong class="neg">{{ _('Saldo negativo') }}</strong> = {{ _('debito: hai consumato più di quello che hai pagato.') }}</li>
-    <li>{{ _("Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune del caffè.") }}</li>
+    <li>{{ _("Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune «Macchinetta del caffè».") }}</li>
     <li>{{ _('Saldi e movimenti sono visibili a tutti, come sul foglio appeso al muro.') }}</li>
   </ul>
 </section>
@@ -28,8 +45,8 @@
   <h2>🔁 {{ _('Come rientrare dal debito') }}</h2>
   <ol>
     <li><strong>{{ _('Salda il debito') }}</strong>: {{ _("metti i soldi nella cassa e registralo in «Pagamenti tra persone» → «Ho dato dei soldi a qualcuno» → Cassa. Conta quando un amministratore conferma.") }}</li>
-    <li><strong>{{ _('Compra il credito di un altro') }}</strong>: {{ _("dai i soldi a chi è in credito (lo vedi in «Saldi di tutti») e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.") }}</li>
-    <li><strong>{{ _('Compra uno dei beni') }}</strong>: {{ _("compra caffè, cialde, acqua o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Il credito arriva quando un amministratore approva.") }}</li>
+    <li><strong>{{ _('Compra il credito di un altro') }}</strong>: {{ _("dai i soldi a chi è in credito (lo vedi in «Saldi di tutti»: tocca il suo nome per vedere il suo PayPal o IBAN) e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.") }}</li>
+    <li><strong>{{ _('Compra uno dei beni') }}</strong>: {{ _("compra caffè, cialde, bottiglie, bicchierini o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Per cialde, bottiglie e bicchierini scrivi quanti pezzi e quanto li hai pagati. Il credito arriva quando un amministratore approva.") }}</li>
   </ol>
 </section>
 
@@ -77,6 +94,7 @@
   <ul>
     <li><strong>{{ _('Ho cambiato telefono o dimenticato il PIN.') }}</strong> {{ _("Chiedi a un amministratore di azzerare il PIN: al prossimo accesso ne sceglierai uno nuovo.") }}</li>
     <li><strong>{{ _('Ho segnato qualcosa per sbaglio.') }}</strong> {{ _('Tocca «Annulla» entro 10 minuti; dopo, chiedi a un amministratore.') }}</li>
+    <li><strong>{{ _('Come pago chi è in credito?') }}</strong> {{ _("Tocca il suo nome in «Saldi di tutti»: nella scheda trovi il suo PayPal o IBAN. Dopo averlo pagato registralo in «Pagamenti tra persone».") }}</li>
     <li><strong>{{ _("Posso usare l'app in inglese?") }}</strong> {{ _('Sì: tocca IT / EN in alto a destra.') }}</li>
   </ul>
 </section>

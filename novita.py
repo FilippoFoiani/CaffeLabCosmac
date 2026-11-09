@@ -9,6 +9,15 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-09b",
+        "it": [
+            "👤 Imposta subito il tuo profilo: tocca «Profilo ed email» e inserisci la tua email (per l'avviso del lunedì) e PayPal o IBAN (per essere pagato da chi compra il tuo credito). Le istruzioni sono in «Come funziona».",
+        ],
+        "en": [
+            "👤 Set up your profile now: tap “Profile and email” and enter your email (for the Monday reminder) and PayPal or IBAN (to get paid by whoever buys your credit). Instructions are in “How it works”.",
+        ],
+    },
+    {
         "id": "2026-11-09",
         "it": [
             "🤝 I pagamenti tra persone li conferma sempre chi riceve i soldi, anche quando paga un amministratore.",
