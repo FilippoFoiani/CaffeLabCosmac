@@ -328,6 +328,333 @@ EN = {
         "This reminder arrives every Monday as long as your balance is negative.",
     "Per non riceverlo più per email: nell'app vai su Profilo e togli la spunta.":
         "To stop receiving it by email: in the app go to Profile and untick the box.",
+
+    # --- richieste, accessi, limite di debito, come funziona ---
+    "in attesa di approvazione":
+        "waiting for approval",
+    "Come funziona":
+        "How it works",
+    "Richieste da approvare: {n}":
+        "Requests to approve: {n}",
+    "Limite di debito":
+        "Debt limit",
+    "Chi supera il limite vede un avviso fisso in cima alla pagina. Puoi scegliere se gli acquisti oltre il limite vengono bloccati o se basta una conferma. 0 = nessun limite.":
+        "Anyone over the limit sees a permanent warning at the top of the page. You can choose whether purchases over the limit are blocked or just need a confirmation. 0 = no limit.",
+    "Limite (€)":
+        "Limit (€)",
+    "Avvisa e chiedi conferma (consigliato: nessuno smette di segnare i caffè)":
+        "Warn and ask for confirmation (recommended: nobody stops logging coffees)",
+    "Blocca gli acquisti finché non salda":
+        "Block purchases until they settle",
+    "Oltre il limite adesso: {n}":
+        "Over the limit right now: {n}",
+    "Richiesta inviata":
+        "Request sent",
+    "Un amministratore deve approvare il tuo accesso. Appena lo fa, questa pagina ti porta dentro l'app: non serve rifare niente.":
+        "An administrator has to approve your access. As soon as they do, this page takes you into the app: you don't need to do anything again.",
+    "Account:":
+        "Account:",
+    "Controlla di nuovo":
+        "Check again",
+    "Intanto leggi come funziona":
+        "Meanwhile, read how it works",
+    "Non sono io / esci":
+        "It's not me / log out",
+    "In breve":
+        "In short",
+    "Inquadra il QR sulla macchinetta, oppure apri l'icona sulla schermata Home.":
+        "Scan the QR code on the machine, or open the icon on your Home screen.",
+    "Tocca + su quello che prendi e poi Conferma. Puoi segnare più cose insieme.":
+        "Tap + on what you take, then Confirm. You can log several things at once.",
+    "Il costo viene scalato dal tuo saldo. Se sbagli, puoi annullare entro 10 minuti.":
+        "The cost is deducted from your balance. If you make a mistake, you can undo it within 10 minutes.",
+    "Il tuo saldo":
+        "Your balance",
+    "Saldo positivo":
+        "Positive balance",
+    "credito: hai messo più soldi di quelli che hai consumato.":
+        "credit: you have put in more money than you have used.",
+    "Saldo negativo":
+        "Negative balance",
+    "debito: hai consumato più di quello che hai pagato.":
+        "debt: you have used more than you have paid.",
+    "Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune del caffè.":
+        "Coffee and water share one balance. Water for the machine is paid by the shared coffee account.",
+    "Saldi e movimenti sono visibili a tutti, come sul foglio appeso al muro.":
+        "Balances and transactions are visible to everyone, just like on the sheet on the wall.",
+    "Come rientrare dal debito":
+        "How to get out of debt",
+    "metti i soldi nella cassa e registralo in «Pagamenti tra persone» → «Ho dato dei soldi a qualcuno» → Cassa. Conta quando un amministratore conferma.":
+        "put the money in the cash box and record it in “Payments between people” → “I gave money to someone” → Cash box. It counts once an administrator confirms.",
+    "dai i soldi a chi è in credito (lo vedi in «Saldi di tutti») e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.":
+        "give the money to someone in credit (see “Everyone's balances”) and record it the same way, choosing that person. It counts once they confirm they received it.",
+    "compra caffè, cialde, acqua o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Il credito arriva quando un amministratore approva.":
+        "buy coffee, pods, water or anything else for the group and record it in “I bought for the group”, with a photo of the receipt. The credit arrives once an administrator approves.",
+    "Tieni basso il debito":
+        "Keep your debt low",
+    "Caffè e acqua li ricompra chi anticipa i soldi: ogni euro di debito è un euro che un collega ha messo di tasca sua. Salda presto!":
+        "Coffee and water are bought again by whoever fronts the money: every euro of debt is a euro a colleague paid out of their own pocket. Settle soon!",
+    "Non aspettare l'avviso: salda appena arrivi a qualche euro di debito.":
+        "Don't wait for the reminder: settle as soon as you owe a few euros.",
+    "Ogni lunedì chi è in negativo riceve un avviso nell'app, e per email se l'ha inserita nel Profilo.":
+        "Every Monday anyone with a negative balance gets a reminder in the app, and by email if they added it in their Profile.",
+    "Il limite di debito è {limite}.":
+        "The debt limit is {limite}.",
+    "Oltre il limite l'app blocca gli acquisti finché non saldi.":
+        "Over the limit the app blocks purchases until you settle.",
+    "Oltre il limite compare un avviso fisso e ogni acquisto va confermato.":
+        "Over the limit a permanent warning appears and every purchase must be confirmed.",
+    "Per ora non c'è un limite di debito, ma un amministratore può impostarlo.":
+        "There is no debt limit for now, but an administrator can set one.",
+    "Chi è in credito può «vendere» il suo credito: è il modo più semplice per pareggiare i conti senza passare dalla cassa.":
+        "People in credit can “sell” their credit: it's the easiest way to even things out without going through the cash box.",
+    "Segna sempre tutto subito: un caffè non segnato lo paga qualcun altro.":
+        "Always log everything right away: an unlogged coffee is paid for by someone else.",
+    "Pulizia: lascia la postazione come vorresti trovarla":
+        "Cleaning: leave the coffee corner the way you'd like to find it",
+    "Butta la cialda o la capsula usata, il bicchierino e la paletta nei rifiuti giusti.":
+        "Throw the used pod or capsule, the cup and the stirrer into the right bin.",
+    "Asciuga gocce e schizzi sul piano e sotto l'erogatore.":
+        "Wipe up drips and splashes on the counter and under the spout.",
+    "Lava e rimetti a posto tazzine e cucchiaini che usi.":
+        "Wash and put back the cups and spoons you use.",
+    "Se la vaschetta delle capsule o quella di raccolta è piena, svuotala.":
+        "If the capsule container or the drip tray is full, empty it.",
+    "Se il serbatoio dell'acqua è quasi vuoto, riempilo con una bottiglia e segna «Acqua macchinetta».":
+        "If the water tank is almost empty, refill it with a bottle and log “Machine water”.",
+    "Se manca qualcosa (caffè, zucchero, bicchierini) o la macchinetta segnala un problema, avvisa un amministratore.":
+        "If something is missing (coffee, sugar, cups) or the machine shows a problem, tell an administrator.",
+    "Regole per essere corretti con tutti":
+        "Rules to be fair to everyone",
+    "Il primo accesso di ogni persona viene approvato da un amministratore.":
+        "Everyone's first login is approved by an administrator.",
+    "Spese e pagamenti tra persone contano solo dopo una conferma: nessuno può cambiare da solo il saldo di un altro.":
+        "Group purchases and payments between people only count after a confirmation: nobody can change someone else's balance on their own.",
+    "Ogni movimento resta registrato con data e autore. Gli errori si correggono chiedendo a un amministratore.":
+        "Every transaction is recorded with date and author. Mistakes are fixed by asking an administrator.",
+    "Domande frequenti":
+        "Frequently asked questions",
+    "Ho cambiato telefono o dimenticato il PIN.":
+        "I changed phone or forgot my PIN.",
+    "Chiedi a un amministratore di azzerare il PIN: al prossimo accesso ne sceglierai uno nuovo.":
+        "Ask an administrator to reset your PIN: you'll choose a new one at your next login.",
+    "Ho segnato qualcosa per sbaglio.":
+        "I logged something by mistake.",
+    "Tocca «Annulla» entro 10 minuti; dopo, chiedi a un amministratore.":
+        "Tap “Undo” within 10 minutes; after that, ask an administrator.",
+    "Posso usare l'app in inglese?":
+        "Can I use the app in English?",
+    "Sì: tocca IT / EN in alto a destra.":
+        "Yes: tap IT / EN at the top right.",
+    "come rientrare":
+        "how to get even",
+    "Hai {n} richieste da confermare":
+        "You have {n} requests to confirm",
+    "Hai 1 richiesta da confermare":
+        "You have 1 request to confirm",
+    "{n} tue richieste in attesa di conferma":
+        "{n} of your requests are waiting for confirmation",
+    "1 tua richiesta in attesa di conferma":
+        "1 of your requests is waiting for confirmation",
+    "Hai superato il limite di debito di {limite} · il tuo saldo è {saldo}":
+        "You are over the debt limit of {limite} · your balance is {saldo}",
+    "Questo avviso resta finché non torni sotto il limite.":
+        "This warning stays until you're back under the limit.",
+    "Oltre il limite di debito: salda prima di prendere altro":
+        "Over the debt limit: settle before taking anything else",
+    "So di essere oltre il limite di debito di {limite}: segna comunque e salderò presto":
+        "I know I'm over the debt limit of {limite}: log it anyway, I'll settle soon",
+    "Richieste":
+        "Requests",
+    "Conta quando l'altra persona conferma di aver ricevuto i soldi (per la Cassa conferma un amministratore).":
+        "It counts once the other person confirms they received the money (for the Cash box an administrator confirms).",
+    "Per sicurezza un amministratore deve approvare il tuo primo accesso: dopo potrai usare l'app.":
+        "For security, an administrator has to approve your first login: then you can use the app.",
+    "Nuovi accessi da approvare":
+        "New logins to approve",
+    "Approva solo se sai chi è: chi viene approvato può segnare acquisti e pagamenti.":
+        "Only approve if you know who it is: approved people can log purchases and payments.",
+    "nuovo account":
+        "new account",
+    "per l'account «{nome}»":
+        "for the account “{nome}”",
+    "Approva":
+        "Approve",
+    "Rifiutare questa richiesta di accesso?":
+        "Reject this login request?",
+    "Rifiuta":
+        "Reject",
+    "Da confermare":
+        "To confirm",
+    "Niente da confermare.":
+        "Nothing to confirm.",
+    "in attesa di {nome}":
+        "waiting for {nome}",
+    "ferma da più di 3 giorni":
+        "pending for more than 3 days",
+    "scontrino":
+        "receipt",
+    "Conferma solo se hai davvero ricevuto i soldi: il tuo saldo scenderà di {importo}.":
+        "Only confirm if you really received the money: your balance will go down by {importo}.",
+    "Rifiutare questa richiesta?":
+        "Reject this request?",
+    "Le mie richieste in attesa":
+        "My pending requests",
+    "Nessuna richiesta in attesa.":
+        "No pending requests.",
+    "aspetta l'ok di un amministratore":
+        "waiting for an administrator's OK",
+    "aspetta la conferma di {nome}":
+        "waiting for {nome} to confirm",
+    "Il credito arriva quando un amministratore approva la spesa: allega la foto dello scontrino per fare prima.":
+        "The credit arrives once an administrator approves the purchase: attach a photo of the receipt to speed things up.",
+    "Foto dello scontrino (facoltativa)":
+        "Photo of the receipt (optional)",
+    "Invia per approvazione":
+        "Send for approval",
+    "Il tuo accesso è stato approvato: benvenuto!":
+        "Your access has been approved: welcome!",
+    "Hai raggiunto il limite di debito di {limite}: salda il debito prima di prendere altro.":
+        "You've reached the debt limit of {limite}: settle your debt before taking anything else.",
+    "Sei oltre il limite di debito di {limite}: spunta la casella per confermare l'acquisto.":
+        "You're over the debt limit of {limite}: tick the box to confirm the purchase.",
+    "Pagamento inviato: conterà quando un amministratore confermerà di aver ricevuto i soldi.":
+        "Payment sent: it will count once an administrator confirms they received the money.",
+    "Pagamento inviato: conterà quando {nome} confermerà di aver ricevuto i soldi.":
+        "Payment sent: it will count once {nome} confirms they received the money.",
+    "La foto non è un'immagine valida o è troppo grande.":
+        "The photo isn't a valid image or is too large.",
+    "Spesa inviata: l'importo ti verrà accreditato quando un amministratore la approva.":
+        "Purchase sent: the amount will be credited to you once an administrator approves it.",
+    "{nome} ha comprato per il gruppo: {cosa}":
+        "{nome} bought for the group: {cosa}",
+    "{nome} dice di aver dato dei soldi a {altro}":
+        "{nome} says they gave money to {altro}",
+    "Richiesta annullata.":
+        "Request cancelled.",
+    "Approvata: {cosa}":
+        "Approved: {cosa}",
+    "Rifiutata: {cosa}":
+        "Rejected: {cosa}",
+    "Accesso approvato: {nome}.":
+        "Access approved: {nome}.",
+    "Accesso rifiutato: {nome}.":
+        "Access rejected: {nome}.",
+    "Limite non valido (es. 10 oppure 7,50; 0 = nessun limite).":
+        "Invalid limit (e.g. 10 or 7.50; 0 = no limit).",
+    "Limite di debito tolto.":
+        "Debt limit removed.",
+    "Limite di debito: {limite} ({modo}).":
+        "Debt limit: {limite} ({modo}).",
+    "blocca gli acquisti":
+        "blocks purchases",
+    "avvisa e chiede conferma":
+        "warns and asks for confirmation",
+
+    # --- registro approvazioni ---
+    "Registro approvazioni: chi ha approvato cosa":
+        "Approvals log: who approved what",
+    "Registro approvazioni":
+        "Approvals log",
+    "automatico":
+        "automatic",
+    "annullata dal richiedente":
+        "cancelled by the requester",
+    "Visibile solo agli amministratori: chi ha chiesto cosa, chi ha deciso e quando. Gli ultimi 300 per sezione; tutto lo storico è nel foglio «Approvazioni» dell'Excel.":
+        "Visible to administrators only: who asked for what, who decided and when. The latest 300 per section; the full history is in the “Approvals” sheet of the Excel file.",
+    "Tutto":
+        "All",
+    "Accessi":
+        "Logins",
+    "Spese":
+        "Purchases",
+    "Ancora nessuna decisione.":
+        "No decisions yet.",
+    "da {nome}":
+        "by {nome}",
+    "da console":
+        "from the console",
+    "Spese per il gruppo":
+        "Group purchases",
+    "registrata direttamente dall'admin {nome}":
+        "recorded directly by admin {nome}",
+    "da {nome}, che ha ricevuto i soldi":
+        "by {nome}, who received the money",
+    "richiesta del {data}":
+        "requested {data}",
+    "Approvazioni":
+        "Approvals",
+    "Richiesta da":
+        "Requested by",
+    "Esito":
+        "Outcome",
+    "Deciso da":
+        "Decided by",
+    "Data decisione":
+        "Decision date",
+    "approvata":
+        "approved",
+    "rifiutata":
+        "rejected",
+    "approvato":
+        "approved",
+    "rifiutato":
+        "rejected",
+    "Pagamento":
+        "Payment",
+    "Accesso":
+        "Login",
+    "console":
+        "console",
+
+    # --- QR ---
+    "Attenzione: questo QR porta a {qr}, ma tu stai usando {attuale}. Controlla CAFFE_URL nel file WSGI su PythonAnywhere, poi premi Reload.":
+        "Warning: this QR code points to {qr}, but you are using {attuale}. Check CAFFE_URL in the WSGI file on PythonAnywhere, then press Reload.",
+    "Scarica l'immagine del QR":
+        "Download the QR image",
+    "Dall'icona sulla schermata Home l'iPhone non permette di stampare: tocca «Scarica l'immagine del QR» (poi Condividi → Stampa), oppure apri questa pagina in Safari.":
+        "From the Home Screen icon the iPhone can't print: tap “Download the QR image” (then Share → Print), or open this page in Safari.",
+
+    # --- backup settimanale ---
+    "Backup settimanale":
+        "Weekly backup",
+    "Ogni lunedì (dalle 8:00) gli amministratori con l'email nel Profilo ricevono l'Excel e il database completo. Se l'account PythonAnywhere si perde, con il database si rimette tutto com'era.":
+        "Every Monday (from 8:00) admins with an email in their Profile receive the Excel file and the full database. If the PythonAnywhere account is lost, the database puts everything back as it was.",
+    "Lo ricevono:":
+        "Sent to:",
+    "nessuno":
+        "nobody",
+    "aggiungi la tua email nel Profilo":
+        "add your email in your Profile",
+    "Amministratori senza email (non lo ricevono): {nomi}":
+        "Admins without an email (they don't get it): {nomi}",
+    "Invia il backup adesso":
+        "Send the backup now",
+    "Puoi anche scaricarli quando vuoi con i pulsanti «Excel» e «Backup» in cima alla pagina.":
+        "You can also download them anytime with the “Excel” and “Backup” buttons at the top of the page.",
+    "Nessun amministratore ha l'email: aggiungi la tua nel Profilo.":
+        "No admin has an email: add yours in your Profile.",
+    "Backup inviato a: {nomi}":
+        "Backup sent to: {nomi}",
+    # email del backup
+    "{app}: backup del {data}":
+        "{app}: backup of {data}",
+    "ecco il backup settimanale di {app}, con i dati aggiornati al {quando}.":
+        "here is the weekly backup of {app}, with data up to {quando}.",
+    "In allegato:":
+        "Attached:",
+    "- {file}: saldi, movimenti e approvazioni, da aprire con Excel;":
+        "- {file}: balances, transactions and approvals, to open with Excel;",
+    "- {file}: il database completo, serve per rimettere in piedi l'app.":
+        "- {file}: the full database, used to bring the app back up.",
+    "In negativo adesso: {n} persone, per un totale di {totale}.":
+        "In debt right now: {n} people, {totale} in total.",
+    "Conserva questa email: se l'account PythonAnywhere si perde, con il file .db si ripristina tutto (guida, «Ripristino da un backup»).":
+        "Keep this email: if the PythonAnywhere account is lost, the .db file restores everything (guide, “Ripristino da un backup”).",
+    "Contiene i dati del gruppo e i PIN cifrati: non inoltrarla.":
+        "It contains the group's data and the encrypted PINs: don't forward it.",
+    "Arriva ogni lunedì agli amministratori che hanno l'email nel Profilo.":
+        "It arrives every Monday for admins who have an email in their Profile.",
 }
 
 

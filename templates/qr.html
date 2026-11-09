@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QR code – {{ nome_app }}</title>
   <style>
-    @page { size: A4; margin: 15mm; }
+    @page { size: A4 portrait; margin: 12mm; }
     body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #2b1d14;
            text-align: center; margin: 0; padding: 24px; }
     h1 { font-size: 34px; margin: 10px 0 2px; }
@@ -18,12 +18,34 @@
     ol li { margin-bottom: 6px; }
     ol .en { display: block; font-size: 14px; }
     .nota { font-size: 14px; color: #555; margin-top: 16px; }
-    .stampa { margin-top: 24px; padding: 12px 22px; font-size: 16px; border-radius: 10px; border: 0;
-              background: #6f4e37; color: #fff; cursor: pointer; }
-    @media print { .stampa, .torna { display: none; } }
+    .pulsanti { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 22px; }
+    .stampa { padding: 12px 22px; font-size: 16px; border-radius: 10px; border: 0; text-decoration: none;
+              background: #6f4e37; color: #fff; cursor: pointer; font-family: inherit; }
+    .stampa.secondario { background: #fff; color: #6f4e37; border: 1px solid #c9b8a8; }
+    .attenzione { background: #fdecea; color: #7f1d1d; border-radius: 10px; padding: 10px 14px; font-weight: 600; overflow-wrap: anywhere; }
+    .nota-app { color: #7a4b00; background: #fff6dd; border-radius: 10px; padding: 10px 14px; font-size: 15px; }
+    .qr { break-inside: avoid; page-break-inside: avoid; }
+    .qr svg { display: block; margin: 0 auto; }
+    /* In stampa: tutto su un solo foglio A4 e il QR mai spezzato tra due pagine */
+    @media print {
+      .pulsanti, .torna, .attenzione, .nota-app { display: none !important; }
+      html, body { height: auto; }
+      body { padding: 0; }
+      .cartello { break-inside: avoid; page-break-inside: avoid; }
+      h1 { font-size: 28pt; margin: 0 0 1mm; }
+      h1 + .en { font-size: 13pt; margin: 0 0 2mm; }
+      .sub { font-size: 12pt; margin: 2mm 0 4mm; }
+      .qr svg { width: 115mm !important; height: 115mm !important; max-width: none; max-height: none; }
+      .url { font-size: 9pt; margin: 2mm 0 5mm; }
+      ol { font-size: 13pt; line-height: 1.35; }
+      ol li { margin-bottom: 2mm; }
+      ol .en { font-size: 10pt; }
+      .nota { font-size: 9.5pt; margin-top: 4mm; }
+    }
   </style>
 </head>
 <body>
+  <div class="cartello">
   <h1>☕ 💧 Hai preso qualcosa?</h1>
   <p class="en">Did you take something?</p>
   <p class="sub">Caffè, acqua o acqua per la macchinetta: inquadra il codice e segnalo qui<br>
@@ -41,7 +63,21 @@
   <p class="nota">Consiglio: aggiungi la pagina alla schermata Home, così la apri con un tocco.<br>
     <span class="en">Tip: add the page to your Home screen to open it with one tap. Switch to English with “EN” at the top.</span><br>
     {% for pr in prodotti %}{{ pr.emoji }} {{ pr.nome }} {{ pr.prezzo_cent|euro(false) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
-  <button class="stampa" onclick="window.print()">Stampa / Print</button>
+  </div>
+  {% if diverso %}
+  <p class="attenzione">⚠️ {{ _('Attenzione: questo QR porta a {qr}, ma tu stai usando {attuale}. Controlla CAFFE_URL nel file WSGI su PythonAnywhere, poi premi Reload.', qr=indirizzo, attuale=host_attuale) }}</p>
+  {% endif %}
+  <div class="pulsanti">
+    <button class="stampa" id="stampa" onclick="window.print()">🖨 Stampa / Print</button>
+    <a class="stampa secondario" href="{{ url_for('qr_png') }}" download="qr-caffe-lab.png">⬇︎ {{ _("Scarica l'immagine del QR") }}</a>
+  </div>
+  <p class="nota-app" id="nota-app" hidden>{{ _("Dall'icona sulla schermata Home l'iPhone non permette di stampare: tocca «Scarica l'immagine del QR» (poi Condividi → Stampa), oppure apri questa pagina in Safari.") }}</p>
+  <script>
+    // Su iPhone, dentro l'app aperta dall'icona sulla Home, window.print() non fa nulla
+    if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+      document.getElementById('nota-app').hidden = false;
+    }
+  </script>
   <p class="torna"><a href="{{ url_for('admin') if utente and utente.admin else url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 </body>
 </html>

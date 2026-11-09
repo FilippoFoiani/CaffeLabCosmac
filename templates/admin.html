@@ -9,6 +9,26 @@
   <a class="btn secondario" href="{{ url_for('admin_backup') }}">💾 Backup</a>
 </div>
 
+<a class="avviso-richieste{% if not n_da_approvare %} vuoto{% endif %}" href="{{ url_for('richieste') }}">📝 {{ _('Richieste da approvare: {n}', n=n_da_approvare) }} →</a>
+<a class="avviso-richieste vuoto" href="{{ url_for('admin_registro') }}">🗂 {{ _('Registro approvazioni: chi ha approvato cosa') }} →</a>
+
+<section class="scheda" id="limite">
+  <h2>🚫 {{ _('Limite di debito') }}</h2>
+  <p class="aiuto">{{ _('Chi supera il limite vede un avviso fisso in cima alla pagina. Puoi scegliere se gli acquisti oltre il limite vengono bloccati o se basta una conferma. 0 = nessun limite.') }}</p>
+  <form method="post" action="{{ url_for('admin_limite') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="riga-campi">
+      <span class="piccolo">{{ _('Limite (€)') }}</span>
+      <input name="limite" inputmode="decimal" class="campo-prezzo" aria-label="{{ _('Limite (€)') }}"
+             value="{{ '%.2f'|format(limite / 100)|replace('.', ',') }}">
+    </div>
+    <label class="spunta"><input type="radio" name="modo" value="avvisa" {% if limite_modo != 'blocca' %}checked{% endif %}> {{ _('Avvisa e chiedi conferma (consigliato: nessuno smette di segnare i caffè)') }}</label>
+    <label class="spunta"><input type="radio" name="modo" value="blocca" {% if limite_modo == 'blocca' %}checked{% endif %}> {{ _('Blocca gli acquisti finché non salda') }}</label>
+    <button type="submit" class="btn">{{ _('Salva') }}</button>
+  </form>
+  {% if limite %}<p class="piccolo">{{ _('Oltre il limite adesso: {n}', n=n_oltre) }}</p>{% endif %}
+</section>
+
 <section class="scheda" id="manutenzione">
   <h2>🔧 {{ _('Manutenzione della macchinetta') }}</h2>
   <p class="aiuto">{{ _('Quando un lavoro è da fare, gli amministratori lo vedono in cima alla pagina principale. Con «Fatta» il conteggio riparte da oggi.') }}</p>
@@ -83,6 +103,24 @@
     </form>
   </div>
   {% endif %}
+</section>
+
+<section class="scheda" id="backup">
+  <h2>💾 {{ _('Backup settimanale') }}</h2>
+  <p class="aiuto">{{ _("Ogni lunedì (dalle 8:00) gli amministratori con l'email nel Profilo ricevono l'Excel e il database completo. Se l'account PythonAnywhere si perde, con il database si rimette tutto com'era.") }}</p>
+  <ul class="elenco-stato">
+    <li>{{ _('Lo ricevono:') }} {% if backup_a %}<strong>{{ backup_a|join(', ') }}</strong>{% else %}<strong class="neg">{{ _('nessuno') }}</strong> ({{ _('aggiungi la tua email nel Profilo') }}){% endif %}</li>
+    {% if backup_senza_email %}<li>{{ _('Amministratori senza email (non lo ricevono): {nomi}', nomi=backup_senza_email|join(', ')) }}</li>{% endif %}
+    {% if esito_backup %}<li>{{ _('Ultimo invio:') }} {{ esito_backup.quando|ora }} · {{ _('{n} email inviate su {tot}', n=esito_backup.inviati, tot=esito_backup.destinatari|length) }}{% if esito_backup.errori %} · <span class="neg">{{ _('Errori: {errori}', errori=esito_backup.errori|join('; ')) }}</span>{% endif %}</li>{% endif %}
+    {% if not email_attiva %}<li>Email: <strong class="neg">{{ _('non configurata') }}</strong> ({{ _('vedi la guida, passo «Email del lunedì»') }})</li>{% endif %}
+  </ul>
+  {% if email_attiva %}
+  <form method="post" action="{{ url_for('admin_backup_invia') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="btn secondario">{{ _('Invia il backup adesso') }}</button>
+  </form>
+  {% endif %}
+  <p class="piccolo">{{ _('Puoi anche scaricarli quando vuoi con i pulsanti «Excel» e «Backup» in cima alla pagina.') }}</p>
 </section>
 
 <section class="scheda">

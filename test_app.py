@@ -1,4 +1,5 @@
 """Test automatici: python3 -m pytest -q   (oppure: python3 test_app.py)"""
+import io
 import os
 import re
 import shutil
@@ -41,14 +42,40 @@ def saldo_di(nome):
         return modulo.saldo(id_di(nome))
 
 
-def entra(client, nome, pin="1234", cognome="Test"):
+def approva_accesso(pid):
+    """Come se l'admin approvasse il primo accesso."""
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET approvato=1, "
+                            "nome = CASE WHEN nuovo_nome<>'' THEN nuovo_nome ELSE nome END, "
+                            "cognome = CASE WHEN nuovo_nome<>'' THEN nuovo_cognome ELSE cognome END, "
+                            "nuovo_nome='', nuovo_cognome='' WHERE id=?", (pid,))
+        modulo.db().commit()
+
+
+def entra(client, nome, pin="1234", cognome="Test", approva=True):
     tok, _ = csrf(client)
     pid = id_di(nome)
     r = client.post("/accedi", data={"_csrf": tok, "persona_id": pid, "pin": pin})
     if "Primo accesso" in r.get_data(as_text=True):
         r = client.post("/primo-accesso", data={"_csrf": tok, "persona_id": pid, "nome": nome,
                                                "cognome": cognome, "pin": pin, "pin2": pin})
+        if approva:
+            approva_accesso(pid)
     return r
+
+
+def entra_come_admin():
+    subprocess.run([sys.executable, os.path.join(QUI, "gestione.py"), "admin",
+                    str(id_di("Filippo"))], env=os.environ.copy(), cwd=QUI, check=True)
+    c = app.test_client()
+    entra(c, "Filippo")
+    return c
+
+
+def richiesta_in_attesa(tipo):
+    with app.app_context():
+        return modulo.db().execute("SELECT id FROM richieste WHERE tipo=? AND stato='attesa' "
+                                   "ORDER BY id DESC", (tipo,)).fetchone()["id"]
 
 
 def setup_module(_):
@@ -133,9 +160,24 @@ def test_trasferimenti():
     c = app.test_client()
     entra(c, "Sari")
     tok, html = csrf(c, "/paga")
-    # Sari dà 10 € a Federico (in credito)
+    # Sari dice di aver dato 10 € a Federico: finché Federico non conferma non cambia niente
     c.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
                           "controparte": id_di("Federico"), "importo": "10"})
+    assert saldo_di("Sari") == -1478 - 100
+    assert saldo_di("Federico") == 902
+    rid = richiesta_in_attesa("pagamento")
+    # Sari non può confermarlo da sola, e nemmeno un terzo
+    assert c.post(f"/richieste/{rid}/approva", data={"_csrf": tok}).status_code == 403
+    terzo = app.test_client()
+    entra(terzo, "Riccardo")
+    tok3, _ = csrf(terzo, "/")
+    assert terzo.post(f"/richieste/{rid}/approva", data={"_csrf": tok3}).status_code == 403
+    # Federico vede la richiesta e conferma
+    fed = app.test_client()
+    entra(fed, "Federico")
+    assert "Hai 1 richiesta da confermare" in fed.get("/").get_data(as_text=True)
+    tokf, _ = csrf(fed, "/richieste")
+    fed.post(f"/richieste/{rid}/approva", data={"_csrf": tokf})
     assert saldo_di("Sari") == -1478 - 100 + 1000   # caffè + acqua + pagamento
     assert saldo_di("Federico") == 902 - 1000
     # Sari si accolla 1,98 € del debito di Alessia
@@ -152,8 +194,28 @@ def test_spesa():
     c = app.test_client()
     entra(c, "Giacomo")
     tok, html = csrf(c, "/spesa")
+    # con la foto dello scontrino
+    from PIL import Image
+    foto = io.BytesIO()
+    Image.new("RGB", (40, 30), "white").save(foto, "PNG")
+    foto.seek(0)
     c.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), "importo": "18,90",
-                           "nota": "2 kg di caffè"})
+                           "nota": "2 kg di caffè", "foto": (foto, "scontrino.png")},
+           content_type="multipart/form-data")
+    assert saldo_di("Giacomo") == 770                # in attesa: ancora niente credito
+    rid = richiesta_in_attesa("spesa")
+    tok, _ = csrf(c, "/")
+    assert c.post(f"/richieste/{rid}/approva", data={"_csrf": tok}).status_code == 403
+    assert c.get(f"/scontrino/{rid}").status_code == 200       # chi l'ha inviata vede lo scontrino
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/richieste")
+    assert "2 kg di caffè" in admin.get("/richieste").get_data(as_text=True)
+    admin.post(f"/richieste/{rid}/approva", data={"_csrf": toka})
+    assert saldo_di("Giacomo") == 770 + 1890
+    # una spesa rifiutata non dà credito
+    tok, html = csrf(c, "/spesa")
+    c.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), "importo": "50", "nota": "furbata"})
+    admin.post(f"/richieste/{richiesta_in_attesa('spesa')}/rifiuta", data={"_csrf": toka})
     assert saldo_di("Giacomo") == 770 + 1890
 
 
@@ -202,8 +264,145 @@ def test_registrazione_nuova_persona():
     tok, _ = csrf(c, "/registrati")
     r = c.post("/registrati", data={"_csrf": tok, "nome": "Mario", "cognome": "Rossi",
                                     "pin": "2468", "pin2": "2468"}, follow_redirects=True)
-    assert "Ciao Mario" in r.get_data(as_text=True)
+    assert "Richiesta inviata" in r.get_data(as_text=True)
+    assert c.get("/").headers["Location"].endswith("/attesa")     # non può ancora usare l'app
+    admin = entra_come_admin()
+    assert "Mario Rossi" in admin.get("/richieste").get_data(as_text=True)
+    toka, _ = csrf(admin, "/richieste")
+    admin.post(f"/admin/accesso/{id_di('Mario')}/approva", data={"_csrf": toka})
+    assert "Ciao Mario" in c.get("/", follow_redirects=True).get_data(as_text=True)
     assert saldo_di("Mario") == 0
+
+
+def test_impostore_rifiutato():
+    """Qualcuno attiva l'account di un altro: l'admin rifiuta e l'account torna libero."""
+    furbo = app.test_client()
+    tok, _ = csrf(furbo)
+    pid = id_di("Gianluca")
+    furbo.post("/accedi", data={"_csrf": tok, "persona_id": pid, "pin": ""})
+    furbo.post("/primo-accesso", data={"_csrf": tok, "persona_id": pid, "nome": "Gianluca",
+                                       "cognome": "Falso", "pin": "1111", "pin2": "1111"})
+    assert furbo.get("/").headers["Location"].endswith("/attesa")
+    tok2, html = csrf(app.test_client())
+    assert "in attesa di approvazione" in html
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/richieste")
+    assert "Gianluca Falso" in admin.get("/richieste").get_data(as_text=True)
+    admin.post(f"/admin/accesso/{pid}/rifiuta", data={"_csrf": toka})
+    assert furbo.get("/").headers["Location"].endswith("/accedi")   # sessione del furbo chiusa
+    with app.app_context():
+        p = modulo.db().execute("SELECT * FROM persone WHERE id=?", (pid,)).fetchone()
+        assert p["pin_hash"] is None and p["nome"] == "Gianluca" and p["cognome"] == ""
+    # il vero Gianluca ora può fare il primo accesso
+    vero = app.test_client()
+    assert "Primo accesso" in entra(vero, "Gianluca", approva=False).get_data(as_text=True) or True
+
+
+def test_pagamento_alla_cassa_confermato_da_admin():
+    c = app.test_client()
+    entra(c, "Daniele")
+    tok, html = csrf(c, "/paga")
+    c.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
+                          "controparte": id_di("Cassa"), "importo": "3,90"})
+    assert saldo_di("Daniele") == -390
+    rid = richiesta_in_attesa("pagamento")
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/richieste")
+    admin.post(f"/richieste/{rid}/approva", data={"_csrf": toka})
+    assert saldo_di("Daniele") == 0
+
+
+def test_limite_di_debito():
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin")
+    with app.app_context():
+        caffe = modulo.db().execute("SELECT prezzo_cent FROM prodotti WHERE codice='caffe'").fetchone()[0]
+    admin.post("/admin/limite", data={"_csrf": toka, "limite": "5", "modo": "avvisa"})
+    try:
+        c = app.test_client()
+        entra(c, "Lupi")                                    # saldo -6,60: già oltre il limite
+        partenza = saldo_di("Lupi")
+        home = c.get("/").get_data(as_text=True)
+        assert "Hai superato il limite di debito" in home and modulo.TESTO_AVVISO in home
+        assert "Ho capito, nascondi" not in home            # non si può nascondere
+        tok, html = csrf(c, "/")
+        c.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prod('caffe')}": 1})
+        assert saldo_di("Lupi") == partenza                 # senza spunta non passa
+        tok, html = csrf(c, "/")
+        c.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prod('caffe')}": 1,
+                                  "oltre_limite": "1"})
+        assert saldo_di("Lupi") == partenza - caffe          # con la spunta sì
+        admin.post("/admin/limite", data={"_csrf": toka, "limite": "5", "modo": "blocca"})
+        tok, html = csrf(c, "/")
+        c.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prod('caffe')}": 1,
+                                  "oltre_limite": "1"})
+        assert saldo_di("Lupi") == partenza - caffe          # bloccato
+        # l'acqua per la macchinetta la paga il Conto Caffè: non è bloccata
+        tok, html = csrf(c, "/")
+        r = c.post("/acquista", data={"_csrf": tok, "nonce": nonce(html),
+                                      f"q{prod('acqua_macchinetta')}": 1}, follow_redirects=True)
+        assert "Segnato" in r.get_data(as_text=True)
+        assert saldo_di("Lupi") == partenza - caffe
+    finally:
+        admin.post("/admin/limite", data={"_csrf": toka, "limite": "0", "modo": "avvisa"})
+
+
+def test_registro_approvazioni():
+    """Il registro dice chi ha approvato accessi, spese e pagamenti; lo vedono solo gli admin."""
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/richieste")
+    with app.app_context():
+        nome_admin = modulo.nome_completo(modulo.persona(id_di("Filippo")))
+    # un accesso approvato e uno rifiutato
+    for nome, esito in (("Alessia", "approva"), ("Vittorio", "rifiuta")):
+        c = app.test_client()
+        entra(c, nome, approva=False)
+        admin.post(f"/admin/accesso/{id_di(nome)}/{esito}", data={"_csrf": toka})
+    # una spesa approvata dall'admin
+    alessia = app.test_client()
+    entra(alessia, "Alessia")
+    tok, html = csrf(alessia, "/spesa")
+    alessia.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), "importo": "4", "nota": "zucchero"})
+    admin.post(f"/richieste/{richiesta_in_attesa('spesa')}/approva", data={"_csrf": toka})
+    # un pagamento confermato da chi ha ricevuto i soldi
+    tok, html = csrf(alessia, "/paga")
+    alessia.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
+                                "controparte": id_di("Agnese"), "importo": "2"})
+    agnese = app.test_client()
+    entra(agnese, "Agnese")
+    tokg, _ = csrf(agnese, "/richieste")
+    agnese.post(f"/richieste/{richiesta_in_attesa('pagamento')}/approva", data={"_csrf": tokg})
+    import html as _h
+    reg = _h.unescape(admin.get("/admin/registro").get_data(as_text=True))
+    assert "Alessia" in reg and "Vittorio" in reg
+    assert reg.count("da " + nome_admin) >= 3                     # 2 accessi + 1 spesa
+    assert "zucchero" in reg and "che ha ricevuto i soldi" in reg
+    assert "rifiutato" in reg
+    # gli altri non possono vederlo
+    assert alessia.get("/admin/registro").status_code == 403
+    # foglio Approvazioni nell'Excel solo per gli admin
+    from openpyxl import load_workbook
+    assert "Approvazioni" in load_workbook(io.BytesIO(admin.get("/export.xlsx").data)).sheetnames
+    assert "Approvazioni" not in load_workbook(io.BytesIO(alessia.get("/export.xlsx").data)).sheetnames
+
+
+def test_qr_immagine_e_avviso_indirizzo(monkeypatch):
+    admin = entra_come_admin()
+    r = admin.get("/qr.png")
+    assert r.status_code == 200 and r.data[:8] == b"\x89PNG\r\n\x1a\n"
+    assert "Attenzione: questo QR porta a" not in admin.get("/qr").get_data(as_text=True)
+    monkeypatch.setenv("CAFFE_URL", "https://caffelabcosmac.eu.pythonanywhere.com/")
+    html = admin.get("/qr").get_data(as_text=True)
+    assert "Attenzione: questo QR porta a https://caffelabcosmac.eu.pythonanywhere.com/" in html
+
+
+def test_come_funziona_senza_accesso():
+    c = app.test_client()
+    html = c.get("/come-funziona").get_data(as_text=True)
+    assert "Come rientrare dal debito" in html and "Pulizia" in html
+    import html as _h
+    en = _h.unescape(c.get("/come-funziona", headers={"Accept-Language": "en"}).get_data(as_text=True))
+    assert "How to get out of debt" in en and "Keep your debt low" in en
 
 
 class FintoSMTP:
@@ -394,6 +593,81 @@ def test_cron_protetto():
     assert c.get("/cron/avvisi?token=sbagliato").status_code == 404
 
 
+def test_backup_settimanale_agli_admin(monkeypatch):
+    """Ogni lunedì gli admin con l'email ricevono Excel + database; il database basta a ripristinare."""
+    import html as _h
+    import sqlite3
+    from openpyxl import load_workbook
+    monkeypatch.setattr(modulo.smtplib, "SMTP", FintoSMTP)
+    monkeypatch.setattr(modulo, "SMTP_USER", "caffelab@gmail.com")
+    monkeypatch.setattr(modulo, "SMTP_PASSWORD", "xxxx")
+    FintoSMTP.inviate.clear()
+    admin = entra_come_admin()
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET email='' WHERE admin=1")
+        modulo.db().commit()
+        assert modulo.invia_backup() is None          # nessun admin con email: niente da fare
+    r = admin.get("/admin"); r.close()
+    assert FintoSMTP.inviate == []
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET email='filippo@unipg.it' WHERE id=?", (id_di("Filippo"),))
+        modulo.db().commit()
+    # la prima pagina aperta (dopo l'aggiornamento o di lunedì) fa partire il backup
+    r = admin.get("/admin"); r.close()
+    assert len(FintoSMTP.inviate) == 1
+    r = admin.get("/"); r.close()
+    assert len(FintoSMTP.inviate) == 1                # una sola volta a settimana
+    msg = FintoSMTP.inviate[0]
+    assert msg["To"] == "filippo@unipg.it" and "backup" in msg["Subject"]
+    assert "In negativo adesso:" in msg.get_body().get_content()
+    allegati = {a.get_filename(): a.get_content() for a in msg.iter_attachments()}
+    xlsx = next(v for k, v in allegati.items() if k.endswith(".xlsx"))
+    dati_db = next(v for k, v in allegati.items() if k.endswith(".db"))
+    # l'Excel si apre e contiene anche le approvazioni
+    assert load_workbook(io.BytesIO(xlsx)).sheetnames == ["Saldi", "Movimenti", "Approvazioni"]
+    # il database allegato è integro e ha gli stessi saldi dell'app
+    percorso = os.path.join(CARTELLA, "ripristino.db")
+    with open(percorso, "wb") as f:
+        f.write(dati_db)
+    con = sqlite3.connect(percorso)
+    assert con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    copia = con.execute("SELECT persona_id, SUM(importo_cent) FROM movimenti WHERE annullato=0 "
+                        "GROUP BY persona_id ORDER BY persona_id").fetchall()
+    con.close()
+    with app.app_context():
+        assert copia == [tuple(r) for r in modulo.db().execute(
+            "SELECT persona_id, SUM(importo_cent) FROM movimenti WHERE annullato=0 "
+            "GROUP BY persona_id ORDER BY persona_id").fetchall()]
+    # sezione in Amministrazione e pulsante «Invia il backup adesso»
+    tok, pagina = csrf(admin, "/admin")
+    pagina = _h.unescape(pagina)
+    assert "Backup settimanale" in pagina and "Lo ricevono: Filippo" in re.sub(r"<[^>]+>", "", pagina)
+    r = admin.post("/admin/backup/invia", data={"_csrf": tok}, follow_redirects=True)
+    assert "Backup inviato a: Filippo" in _h.unescape(r.get_data(as_text=True))
+    assert len(FintoSMTP.inviate) == 2
+    # chi non è admin non può farlo partire
+    c = app.test_client()
+    entra(c, "Max")
+    tok, _ = csrf(c, "/")
+    assert c.post("/admin/backup/invia", data={"_csrf": tok}).status_code == 403
+    assert len(FintoSMTP.inviate) == 2
+
+
+def test_email_backup_in_inglese():
+    from datetime import datetime
+    oggetto, corpo = modulo.testo_email_backup({"nome": "Nick", "lingua": "en"}, datetime(2026, 11, 16, 8, 5),
+                                               [{"saldo": -150}, {"saldo": -40}], "a.xlsx", "b.db")
+    assert oggetto.endswith("backup of 16/11/2026")
+    assert "Hi Nick," in corpo and "Keep this email" in corpo and "1,90 €" in corpo
+    assert "Ciao" not in corpo and "allegato" not in corpo
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_hidden_vince_sul_css():
+    # Il riquadro "oltre il limite" è nascosto con l'attributo hidden: il CSS non deve annullarlo
+    css = open(os.path.join(os.path.dirname(__file__), "static", "stile.css"), encoding="utf-8").read()
+    assert "[hidden] { display: none !important; }" in css

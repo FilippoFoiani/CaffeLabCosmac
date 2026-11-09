@@ -3,6 +3,7 @@
 <section class="scheda">
   <h1>{{ _('Primo accesso') }}</h1>
   <p class="aiuto">{{ _('Controlla nome e cognome e scegli un PIN di 4–8 cifre. Ti servirà solo se cambi telefono o esci.') }}</p>
+  <p class="aiuto">🔒 {{ _("Per sicurezza un amministratore deve approvare il tuo primo accesso: dopo potrai usare l'app.") }}</p>
   <form method="post" action="{{ url_for('primo_accesso') }}" class="modulo">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="hidden" name="persona_id" value="{{ p.id }}">

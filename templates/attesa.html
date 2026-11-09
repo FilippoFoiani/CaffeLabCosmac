@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block contenuto %}
+<section class="scheda centro">
+  <div class="icona-grande">⏳</div>
+  <h1>{{ _('Richiesta inviata') }}</h1>
+  <p>{{ _("Un amministratore deve approvare il tuo accesso. Appena lo fa, questa pagina ti porta dentro l'app: non serve rifare niente.") }}</p>
+  <p class="aiuto">{{ _('Account:') }} <strong>{{ (p.nuovo_nome ~ ' ' ~ p.nuovo_cognome)|trim or p|nome }}</strong></p>
+  <a class="btn" href="{{ url_for('attesa') }}">↻ {{ _('Controlla di nuovo') }}</a>
+  <p class="aiuto"><a href="{{ url_for('come_funziona') }}">❓ {{ _('Intanto leggi come funziona') }}</a></p>
+  <form method="post" action="{{ url_for('esci') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="link-btn" type="submit">{{ _('Non sono io / esci') }}</button>
+  </form>
+</section>
+{% endblock %}

@@ -11,13 +11,14 @@ import os
 import secrets
 import smtplib
 import sqlite3
+import tempfile
 import uuid
 from email.message import EmailMessage
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from zoneinfo import ZoneInfo
 
-from flask import (Flask, abort, flash, g, has_request_context, redirect, render_template,
+from flask import (Flask, abort, flash, g, has_app_context, redirect, render_template,
                    request, send_file, session, url_for)
 
 from lingue import LINGUE, traduci
@@ -48,6 +49,8 @@ MAX_QTA_PER_VOLTA = 20             # per ciascun prodotto in un singolo acquisto
 MANUTENZIONI_ESEMPIO = [("Pulizia della macchinetta", 7), ("Decalcificazione", 30)]
 TESTO_PULIZIA = "Ricorda di lasciare pulito dopo aver consumato il caffè!"
 MAX_IMPORTO_CENT = 50000            # 500 €: oltre è quasi certamente un errore di battitura
+SCONTRINI_DIR = os.path.join(DATA_DIR, "scontrini")   # foto degli scontrini delle spese
+MAX_FOTO_BYTE = 12 * 1024 * 1024
 
 # Avviso del lunedì per chi ha il saldo negativo
 TESTO_AVVISO = "SALDA IL DEBITO, COMPRA IL CREDITO DI UN ALTRO UTENTE O COMPRA UNO DEI BENI"
@@ -76,6 +79,7 @@ def _chiave_segreta():
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.config.update(
+    MAX_CONTENT_LENGTH=MAX_FOTO_BYTE + 1024 * 1024,
     SECRET_KEY=_chiave_segreta(),
     PERMANENT_SESSION_LIFETIME=timedelta(days=400),   # il telefono "si ricorda" di te
     SESSION_COOKIE_HTTPONLY=True,
@@ -140,6 +144,31 @@ CREATE TABLE IF NOT EXISTS manutenzioni (
     ultima_da   INTEGER REFERENCES persone(id),
     attivo      INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS richieste (
+    id             INTEGER PRIMARY KEY,
+    ts             TEXT    NOT NULL,
+    tipo           TEXT    NOT NULL,                   -- spesa | pagamento
+    richiedente_id INTEGER NOT NULL REFERENCES persone(id),
+    controparte_id INTEGER REFERENCES persone(id),     -- pagamento: chi ha ricevuto i soldi
+    importo_cent   INTEGER NOT NULL,
+    nota           TEXT    NOT NULL DEFAULT '',
+    foto           TEXT    NOT NULL DEFAULT '',
+    stato          TEXT    NOT NULL DEFAULT 'attesa',  -- attesa | approvata | rifiutata | annullata
+    deciso_da      INTEGER REFERENCES persone(id),
+    deciso_ts      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_richieste_stato ON richieste(stato);
+CREATE TABLE IF NOT EXISTS registro_accessi (
+    id         INTEGER PRIMARY KEY,
+    ts         TEXT    NOT NULL,
+    persona_id INTEGER,                     -- vuoto se l'account nuovo rifiutato è stato cancellato
+    account    TEXT    NOT NULL DEFAULT '', -- nome dell'account com'era prima della richiesta
+    richiesto  TEXT    NOT NULL DEFAULT '', -- nome e cognome inseriti da chi ha chiesto l'accesso
+    email      TEXT    NOT NULL DEFAULT '',
+    nuovo      INTEGER NOT NULL DEFAULT 0,  -- 1 = registrazione di un account nuovo
+    esito      TEXT    NOT NULL,            -- approvato | rifiutato | automatico
+    deciso_da  INTEGER                      -- admin che ha deciso (vuoto = da console)
+);
 CREATE TABLE IF NOT EXISTS manutenzioni_fatte (
     id              INTEGER PRIMARY KEY,
     manutenzione_id INTEGER NOT NULL REFERENCES manutenzioni(id),
@@ -182,13 +211,24 @@ def inizializza_db():
         for col, tipo in (("email", "TEXT NOT NULL DEFAULT ''"),
                           ("avvisi_email", "INTEGER NOT NULL DEFAULT 1"),
                           ("avviso_letto", "TEXT NOT NULL DEFAULT ''"),
-                          ("lingua", "TEXT NOT NULL DEFAULT ''")):
+                          ("lingua", "TEXT NOT NULL DEFAULT ''"),
+                          # accesso approvato dall'admin (chi era già attivo resta approvato)
+                          ("approvato", "INTEGER NOT NULL DEFAULT 1"),
+                          ("richiesta_ts", "TEXT NOT NULL DEFAULT ''"),
+                          ("nuovo_nome", "TEXT NOT NULL DEFAULT ''"),
+                          ("nuovo_cognome", "TEXT NOT NULL DEFAULT ''"),
+                          ("nuovo_account", "INTEGER NOT NULL DEFAULT 0")):
             if col not in colonne_p:
                 con.execute(f"ALTER TABLE persone ADD COLUMN {col} {tipo}")
         # Le prime email partiranno dal prossimo lunedì, non appena si installa l'app
         con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('avviso_settimana', ?)",
                     (settimana_corrente(),))
         con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('avviso_esito', '')")
+        # Backup per email agli amministratori: il primo parte subito, poi ogni lunedì
+        con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('backup_settimana', '')")
+        con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('backup_esito', '')")
+        con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('limite_debito_cent', '0')")
+        con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('limite_modo', 'avvisa')")
         # Promemoria di manutenzione di esempio (una volta sola; l'admin li modifica)
         if con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('manutenzioni_esempio', '1')").rowcount:
             for nome, giorni in MANUTENZIONI_ESEMPIO:
@@ -265,7 +305,7 @@ def ora_locale(iso):
 
 
 def lingua_corrente():
-    return g.get("lingua", "it") if has_request_context() else "it"
+    return g.get("lingua", "it") if has_app_context() else "it"
 
 
 def _(chiave, /, **valori):
@@ -294,6 +334,26 @@ def nome_completo(p):
 app.jinja_env.filters["euro"] = euro
 app.jinja_env.filters["ora"] = ora_locale
 app.jinja_env.filters["nome"] = nome_completo
+
+
+def impostazione(chiave, predefinito=""):
+    r = db().execute("SELECT valore FROM impostazioni WHERE chiave=?", (chiave,)).fetchone()
+    return r["valore"] if r else predefinito
+
+
+def imposta(chiave, valore):
+    db().execute("INSERT INTO impostazioni VALUES (?, ?) ON CONFLICT(chiave) DO UPDATE SET valore=?",
+                 (chiave, str(valore), str(valore)))
+
+
+def limite_debito():
+    """(limite in centesimi, modo) – limite 0 = nessun limite; modo 'avvisa' oppure 'blocca'."""
+    try:
+        cent = int(impostazione("limite_debito_cent", "0"))
+    except ValueError:
+        cent = 0
+    modo = impostazione("limite_modo", "avvisa")
+    return cent, modo if modo in ("avvisa", "blocca") else "avvisa"
 
 
 def prodotti(solo_attivi=True):
@@ -402,7 +462,8 @@ def puo_annullare(m, utente):
         return False
     if utente["admin"]:
         return True
-    if m["creato_da"] != utente["id"]:
+    # spese e pagamenti passano già da un'approvazione: da soli si annullano solo gli acquisti
+    if m["creato_da"] != utente["id"] or m["tipo"] != "acquisto":
         return False
     return datetime.now(timezone.utc) - da_iso(m["ts"]) <= FINESTRA_ANNULLA
 
@@ -430,12 +491,16 @@ def prima_di_ogni_richiesta():
         if not token or not secrets.compare_digest(token, session.get("_csrf", "")):
             abort(400, "Sessione scaduta")
     g.utente = None
+    g.in_attesa = None
     uid = session.get("uid")
     if uid:
         p = persona(uid)
         if p and p["attivo"] and not p["speciale"] and p["pin_hash"] \
                 and session.get("ver") == p["versione_sessione"]:
-            g.utente = p
+            if p["approvato"]:
+                g.utente = p
+            else:
+                g.in_attesa = p          # PIN scelto, ma l'admin non ha ancora dato l'ok
             if p["lingua"] in LINGUE and not session.get("lingua"):
                 g.lingua = session["lingua"] = p["lingua"]
         else:
@@ -457,7 +522,15 @@ def cambia_lingua(codice):
 
 @app.context_processor
 def variabili_template():
-    return {"utente": g.get("utente"), "nome_app": NOME_APP, "lingua": lingua_corrente()}
+    return {"utente": g.get("utente"), "nome_app": NOME_APP, "lingua": lingua_corrente(),
+            "versione_css": VERSIONE_CSS}
+
+
+# Cambia a ogni aggiornamento del CSS, così i telefoni non usano la copia vecchia in cache
+try:
+    VERSIONE_CSS = int(os.path.getmtime(os.path.join(app.root_path, "static", "stile.css")))
+except OSError:
+    VERSIONE_CSS = 0
 
 
 app.jinja_env.globals["_"] = _
@@ -467,7 +540,7 @@ def login_richiesto(f):
     @wraps(f)
     def wrapper(*a, **kw):
         if not g.utente:
-            return redirect(url_for("accedi"))
+            return redirect(url_for("attesa" if g.get("in_attesa") else "accedi"))
         return f(*a, **kw)
     return wrapper
 
@@ -509,6 +582,8 @@ def persone_con_accesso():
 def accedi():
     if g.utente:
         return redirect(url_for("home"))
+    if g.in_attesa:
+        return redirect(url_for("attesa"))
     if request.method == "POST":
         p = persona(request.form.get("persona_id", type=int) or 0)
         pin = request.form.get("pin", "").strip()
@@ -525,7 +600,7 @@ def accedi():
                 db().execute("UPDATE persone SET tentativi=0, bloccato_fino=NULL WHERE id=?",
                              (p["id"],))
             apri_sessione(p)
-            return redirect(url_for("home"))
+            return redirect(url_for("home" if p["approvato"] else "attesa"))
         tentativi = p["tentativi"] + 1
         blocco = None
         if tentativi >= MAX_TENTATIVI_PIN:
@@ -565,11 +640,29 @@ def primo_accesso():
                                email=request.form.get("email", ""))
     email = email_valida(request.form.get("email"))
     with db():
-        db().execute("UPDATE persone SET nome=?, cognome=?, pin_hash=?, email=? WHERE id=?",
-                     (nome, cognome, generate_password_hash(pin), email, p["id"]))
+        if p["admin"]:          # gli amministratori non devono aspettare
+            db().execute("UPDATE persone SET nome=?, cognome=?, pin_hash=?, email=?, approvato=1 "
+                         "WHERE id=?", (nome, cognome, generate_password_hash(pin), email, p["id"]))
+            scrivi_registro_accesso(persona(p["id"]), "automatico", p["id"])
+        else:                   # il nome nuovo diventa effettivo solo quando l'admin approva
+            db().execute("UPDATE persone SET pin_hash=?, email=?, approvato=0, richiesta_ts=?, "
+                         "nuovo_nome=?, nuovo_cognome=?, nuovo_account=0 WHERE id=?",
+                         (generate_password_hash(pin), email, adesso(), nome, cognome, p["id"]))
     apri_sessione(persona(p["id"]))
-    flash(_("Account attivato! Da ora questo telefono si ricorda di te."), "ok")
-    return redirect(url_for("home"))
+    if p["admin"]:
+        flash(_("Account attivato! Da ora questo telefono si ricorda di te."), "ok")
+        return redirect(url_for("home"))
+    return redirect(url_for("attesa"))
+
+
+@app.get("/attesa")
+def attesa():
+    if g.utente:
+        flash(_("Il tuo accesso è stato approvato: benvenuto!"), "ok")
+        return redirect(url_for("home"))
+    if not g.in_attesa:
+        return redirect(url_for("accedi"))
+    return render_template("attesa.html", p=g.in_attesa)
 
 
 @app.route("/registrati", methods=["GET", "POST"])
@@ -596,12 +689,12 @@ def registrati():
                                    email=request.form.get("email", ""))
         with db():
             cur = db().execute(
-                "INSERT INTO persone (nome, cognome, pin_hash, email, creato) VALUES (?,?,?,?,?)",
+                "INSERT INTO persone (nome, cognome, pin_hash, email, creato, approvato, "
+                "richiesta_ts, nuovo_account) VALUES (?,?,?,?,?,0,?,1)",
                 (nome, cognome, generate_password_hash(pin),
-                 email_valida(request.form.get("email")), adesso()))
+                 email_valida(request.form.get("email")), adesso(), adesso()))
         apri_sessione(persona(cur.lastrowid))
-        flash(_("Benvenuto! Il tuo account è pronto."), "ok")
-        return redirect(url_for("home"))
+        return redirect(url_for("attesa"))
     return render_template("registrati.html")
 
 
@@ -628,13 +721,16 @@ def home():
     creatori = {m["creato_da"] for m in ultimi if m["creato_da"]}
     nomi = {c: nome_completo(persona(c)) for c in creatori}
     mio_saldo = saldo(u["id"])
+    limite, modo = limite_debito()
+    oltre_limite = bool(limite) and mio_saldo < -limite
     avviso = None
-    if mio_saldo < 0 and u["avviso_letto"] != settimana_corrente():
+    if mio_saldo < 0 and (oltre_limite or u["avviso_letto"] != settimana_corrente()):
         avviso = {"cassa": conto_cassa(), "creditori": creditori(db(), 3),
-                  "importo": f"{-mio_saldo / 100:.2f}".replace(".", ",")}
+                  "importo": f"{-mio_saldo / 100:.2f}".replace(".", ","), "oltre_limite": oltre_limite}
     manutenzioni = [m for m in manutenzioni_con_stato() if m["da_fare"]] if u["admin"] else []
     return render_template("home.html", saldo=mio_saldo, ultimi=ultimi, nomi=nomi, avviso=avviso,
-                           manutenzioni=manutenzioni,
+                           manutenzioni=manutenzioni, limite=limite, limite_modo=modo,
+                           da_fare=conta_da_fare(u), mie_in_attesa=mie_richieste_in_attesa(u["id"]),
                            prodotti=prodotti(), conti={p["id"]: nome_completo(p)
                                                        for p in elenco_saldi()},
                            ultimo=ultimo_acquisto_annullabile(u["id"]),
@@ -724,6 +820,17 @@ def acquista():
     if not scelte:
         flash(_("Scegli almeno un prodotto con il +."), "errore")
         return redirect(url_for("home"))
+    limite, modo = limite_debito()
+    a_mio_carico = sum(q * pr["prezzo_cent"] for pr, q in scelte if not pr["addebito_id"])
+    if limite and a_mio_carico and saldo(u["id"]) - a_mio_carico < -limite:
+        if modo == "blocca":
+            flash(_("Hai raggiunto il limite di debito di {limite}: salda il debito prima di prendere altro.",
+                    limite=euro(limite, segno=False)), "errore")
+            return redirect(url_for("home"))
+        if request.form.get("oltre_limite") != "1":
+            flash(_("Sei oltre il limite di debito di {limite}: spunta la casella per confermare l'acquisto.",
+                    limite=euro(limite, segno=False)), "errore")
+            return redirect(url_for("home"))
     if nonce_gia_usato(request.form.get("nonce")):
         return redirect(url_for("home"))
     gruppo = uuid.uuid4().hex
@@ -824,12 +931,25 @@ def paga():
         n_io, n_altro = nome_completo(u), nome_completo(altro)
         extra = f" – {nota}" if nota else ""
         gruppo = uuid.uuid4().hex
+        if verso == "dato" and not u["admin"]:
+            # il saldo dell'altro scende: conta solo quando lui (o l'admin, per i conti comuni) conferma
+            with db():
+                db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, controparte_id, "
+                             "importo_cent, nota) VALUES (?, 'pagamento', ?, ?, ?, ?)",
+                             (adesso(), u["id"], altro["id"], importo, nota))
+            if altro["speciale"]:
+                flash(_("Pagamento inviato: conterà quando un amministratore confermerà di aver ricevuto i soldi."), "ok")
+            else:
+                flash(_("Pagamento inviato: conterà quando {nome} confermerà di aver ricevuto i soldi.",
+                        nome=n_altro), "ok")
+            return redirect(url_for("home"))
         with db():
-            if verso == "dato":
-                registra(u["id"], "trasferimento", importo, controparte_id=altro["id"],
-                         gruppo=gruppo, nota=f"Soldi dati a {n_altro}{extra}", creato_da=u["id"])
-                registra(altro["id"], "trasferimento", -importo, controparte_id=u["id"],
-                         gruppo=gruppo, nota=f"Soldi ricevuti da {n_io}{extra}", creato_da=u["id"])
+            if verso == "dato":         # qui arriva solo un admin: vale subito, ma resta nel registro
+                registra_pagamento(u, altro, importo, nota, gruppo)
+                db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, controparte_id, importo_cent, "
+                             "nota, stato, deciso_da, deciso_ts) VALUES (?, 'pagamento', ?, ?, ?, ?, "
+                             "'approvata', ?, ?)", (adesso(), u["id"], altro["id"], importo, nota,
+                                                    u["id"], adesso()))
             else:
                 registra(u["id"], "trasferimento", -importo, controparte_id=altro["id"],
                          gruppo=gruppo, nota=f"Mi sono preso il debito di {n_altro}{extra}",
@@ -877,12 +997,224 @@ def spesa():
                                    nonce=secrets.token_urlsafe(8))
         if nonce_gia_usato(request.form.get("nonce")):
             return redirect(url_for("home"))
+        if g.utente["admin"]:
+            with db():
+                registra(g.utente["id"], "spesa", importo, nota=f"Spesa per il gruppo: {nota}",
+                         creato_da=g.utente["id"])
+                db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, stato, "
+                             "deciso_da, deciso_ts) VALUES (?, 'spesa', ?, ?, ?, 'approvata', ?, ?)",
+                             (adesso(), g.utente["id"], importo, nota, g.utente["id"], adesso()))
+            flash(_("Spesa registrata. Nuovo saldo: {saldo}", saldo=euro(saldo(g.utente['id']))), "ok")
+            return redirect(url_for("home"))
+        try:
+            foto = salva_scontrino(request.files.get("foto"))
+        except ValueError:
+            flash(_("La foto non è un'immagine valida o è troppo grande."), "errore")
+            return render_template("spesa.html", form=request.form, nonce=secrets.token_urlsafe(8))
         with db():
-            registra(g.utente["id"], "spesa", importo, nota=f"Spesa per il gruppo: {nota}",
-                     creato_da=g.utente["id"])
-        flash(_("Spesa registrata. Nuovo saldo: {saldo}", saldo=euro(saldo(g.utente['id']))), "ok")
+            db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, foto) "
+                         "VALUES (?, 'spesa', ?, ?, ?, ?)", (adesso(), g.utente["id"], importo, nota, foto))
+        flash(_("Spesa inviata: l'importo ti verrà accreditato quando un amministratore la approva."), "ok")
         return redirect(url_for("home"))
     return render_template("spesa.html", form={}, nonce=secrets.token_urlsafe(8))
+
+
+# --------------------------------------------------------------------------
+# Richieste da approvare: spese, pagamenti, nuovi accessi
+# --------------------------------------------------------------------------
+def scrivi_registro_accesso(p, esito, deciso_da, con=None):
+    con = con or db()
+    richiesto = f"{p['nuovo_nome']} {p['nuovo_cognome']}".strip() or nome_completo(p)
+    con.execute("INSERT INTO registro_accessi (ts, persona_id, account, richiesto, email, nuovo, esito, "
+                "deciso_da) VALUES (?,?,?,?,?,?,?,?)",
+                (adesso(), p["id"], "" if p["nuovo_account"] else nome_completo(p), richiesto,
+                 p["email"] or "", p["nuovo_account"], esito, deciso_da))
+
+
+def registra_pagamento(da, a, importo, nota, gruppo=None):
+    """«da» ha dato soldi ad «a»: il saldo di «da» sale, quello di «a» scende."""
+    gruppo = gruppo or uuid.uuid4().hex
+    extra = f" – {nota}" if nota else ""
+    registra(da["id"], "trasferimento", importo, controparte_id=a["id"], gruppo=gruppo,
+             nota=f"Soldi dati a {nome_completo(a)}{extra}", creato_da=da["id"])
+    registra(a["id"], "trasferimento", -importo, controparte_id=da["id"], gruppo=gruppo,
+             nota=f"Soldi ricevuti da {nome_completo(da)}{extra}", creato_da=da["id"])
+
+
+def salva_scontrino(file):
+    """Salva la foto dello scontrino (ridotta, se possibile). Ritorna il nome del file o ''."""
+    if not file or not file.filename:
+        return ""
+    dati = file.read(MAX_FOTO_BYTE + 1)
+    if not dati:
+        return ""
+    if len(dati) > MAX_FOTO_BYTE:
+        raise ValueError("troppo grande")
+    os.makedirs(SCONTRINI_DIR, exist_ok=True)
+    nome = f"{uuid.uuid4().hex}.jpg"
+    try:
+        from PIL import Image, ImageOps
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(dati)))
+        img.thumbnail((1600, 1600))
+        img.convert("RGB").save(os.path.join(SCONTRINI_DIR, nome), "JPEG", quality=80)
+    except ImportError:          # senza Pillow si salva così com'è
+        if not dati[:3] == b"\xff\xd8\xff" and not dati[:8] == b"\x89PNG\r\n\x1a\n":
+            raise ValueError("non è un'immagine")
+        with open(os.path.join(SCONTRINI_DIR, nome), "wb") as f:
+            f.write(dati)
+    except Exception:
+        raise ValueError("non è un'immagine")
+    return nome
+
+
+def puo_decidere(r, utente):
+    """Chi può approvare una richiesta: l'admin sempre; per un pagamento anche chi ha ricevuto i soldi."""
+    if r["stato"] != "attesa":
+        return False
+    if utente["admin"]:
+        return True
+    return r["tipo"] == "pagamento" and r["controparte_id"] == utente["id"]
+
+
+def richieste_da_decidere(utente):
+    if utente["admin"]:
+        return db().execute("SELECT * FROM richieste WHERE stato='attesa' ORDER BY id").fetchall()
+    return db().execute("SELECT * FROM richieste WHERE stato='attesa' AND tipo='pagamento' "
+                        "AND controparte_id=? ORDER BY id", (utente["id"],)).fetchall()
+
+
+def accessi_in_attesa():
+    return db().execute("SELECT * FROM persone WHERE pin_hash IS NOT NULL AND approvato=0 "
+                        "AND attivo=1 AND speciale=0 ORDER BY richiesta_ts").fetchall()
+
+
+def mie_richieste_in_attesa(uid):
+    return db().execute("SELECT * FROM richieste WHERE stato='attesa' AND richiedente_id=? "
+                        "ORDER BY id DESC", (uid,)).fetchall()
+
+
+def conta_da_fare(utente):
+    n = len(richieste_da_decidere(utente))
+    if utente["admin"]:
+        n += len(accessi_in_attesa())
+    return n
+
+
+def descrivi_richiesta(r):
+    chi = nome_completo(persona(r["richiedente_id"]))
+    if r["tipo"] == "spesa":
+        return _("{nome} ha comprato per il gruppo: {cosa}", nome=chi, cosa=r["nota"])
+    testo = _("{nome} dice di aver dato dei soldi a {altro}", nome=chi,
+              altro=nome_completo(persona(r["controparte_id"])))
+    return f"{testo} – {r['nota']}" if r["nota"] else testo
+
+
+app.jinja_env.filters["richiesta"] = descrivi_richiesta
+
+
+@app.get("/richieste")
+@login_richiesto
+def richieste():
+    u = g.utente
+    elenco = richieste_da_decidere(u)
+    return render_template("richieste.html", da_decidere=elenco,
+                           accessi=accessi_in_attesa() if u["admin"] else [],
+                           mie=mie_richieste_in_attesa(u["id"]),
+                           vecchie={r["id"] for r in elenco
+                                    if datetime.now(timezone.utc) - da_iso(r["ts"]) > timedelta(days=3)},
+                           nomi={p["id"]: nome_completo(p) for p in elenco_saldi(includi_inattivi=True)})
+
+
+@app.post("/richieste/<int:rid>/<azione>")
+@login_richiesto
+def decidi_richiesta(rid, azione):
+    u = g.utente
+    r = db().execute("SELECT * FROM richieste WHERE id=?", (rid,)).fetchone() or abort(404)
+    if azione == "annulla":
+        if r["richiedente_id"] != u["id"] or r["stato"] != "attesa":
+            abort(403)
+        with db():
+            db().execute("UPDATE richieste SET stato='annullata', deciso_da=?, deciso_ts=? WHERE id=?",
+                         (u["id"], adesso(), rid))
+        flash(_("Richiesta annullata."), "ok")
+        return redirect(request.referrer or url_for("home"))
+    if azione not in ("approva", "rifiuta") or not puo_decidere(r, u):
+        abort(403)
+    richiedente = persona(r["richiedente_id"])
+    with db():
+        db().execute("UPDATE richieste SET stato=?, deciso_da=?, deciso_ts=? WHERE id=? AND stato='attesa'",
+                     ("approvata" if azione == "approva" else "rifiutata", u["id"], adesso(), rid))
+        if azione == "approva":
+            if r["tipo"] == "spesa":
+                registra(richiedente["id"], "spesa", r["importo_cent"],
+                         nota=f"Spesa per il gruppo: {r['nota']}", creato_da=richiedente["id"])
+            else:
+                registra_pagamento(richiedente, persona(r["controparte_id"]), r["importo_cent"], r["nota"])
+    flash(_("Approvata: {cosa}", cosa=descrivi_richiesta(r)) if azione == "approva"
+          else _("Rifiutata: {cosa}", cosa=descrivi_richiesta(r)), "ok")
+    return redirect(request.referrer or url_for("richieste"))
+
+
+@app.get("/scontrino/<int:rid>")
+@login_richiesto
+def scontrino(rid):
+    r = db().execute("SELECT * FROM richieste WHERE id=?", (rid,)).fetchone()
+    if not r or not r["foto"] or not (g.utente["admin"] or r["richiedente_id"] == g.utente["id"]):
+        abort(404)
+    return send_file(os.path.join(SCONTRINI_DIR, os.path.basename(r["foto"])), mimetype="image/jpeg")
+
+
+@app.post("/admin/accesso/<int:pid>/<azione>")
+@admin_richiesto
+def admin_accesso(pid, azione):
+    p = persona(pid) or abort(404)
+    if not p["pin_hash"] or p["approvato"]:
+        return redirect(url_for("richieste"))
+    if azione not in ("approva", "rifiuta"):
+        abort(404)
+    with db():
+        scrivi_registro_accesso(p, "approvato" if azione == "approva" else "rifiutato", g.utente["id"])
+        if azione == "approva":
+            db().execute("UPDATE persone SET approvato=1, "
+                         "nome = CASE WHEN nuovo_nome<>'' THEN nuovo_nome ELSE nome END, "
+                         "cognome = CASE WHEN nuovo_nome<>'' THEN nuovo_cognome ELSE cognome END, "
+                         "nuovo_nome='', nuovo_cognome='', nuovo_account=0 WHERE id=?", (pid,))
+            flash(_("Accesso approvato: {nome}.", nome=nome_completo(persona(pid))), "ok")
+        elif azione == "rifiuta":
+            usato = db().execute("SELECT 1 FROM movimenti WHERE persona_id=? OR creato_da=? LIMIT 1",
+                                 (pid, pid)).fetchone()
+            if p["nuovo_account"] and not usato:
+                db().execute("DELETE FROM richieste WHERE richiedente_id=?", (pid,))
+                db().execute("DELETE FROM persone WHERE id=?", (pid,))
+            else:     # l'account torna "mai entrato": il vero proprietario potrà attivarlo
+                db().execute("UPDATE persone SET pin_hash=NULL, email='', approvato=0, nuovo_nome='', "
+                             "nuovo_cognome='', versione_sessione=versione_sessione+1 WHERE id=?", (pid,))
+            flash(_("Accesso rifiutato: {nome}.", nome=nome_completo(p)), "ok")
+    return redirect(request.referrer or url_for("richieste"))
+
+
+def registro_dati(limite=300):
+    accessi = db().execute("SELECT * FROM registro_accessi ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
+    decise = db().execute("SELECT * FROM richieste WHERE stato<>'attesa' ORDER BY COALESCE(deciso_ts, ts) DESC, "
+                          "id DESC LIMIT ?", (limite,)).fetchall()
+    nomi = {p["id"]: nome_completo(p) for p in db().execute("SELECT * FROM persone")}
+    admin = {p["id"] for p in db().execute("SELECT id FROM persone WHERE admin=1")}
+    return accessi, [r for r in decise if r["tipo"] == "spesa"], \
+        [r for r in decise if r["tipo"] == "pagamento"], nomi, admin
+
+
+@app.get("/admin/registro")
+@admin_richiesto
+def admin_registro():
+    accessi, spese, pagamenti, nomi, admin = registro_dati()
+    return render_template("registro.html", accessi=accessi, spese=spese, pagamenti=pagamenti,
+                           nomi=nomi, admin_ids=admin, sezione=request.args.get("sezione", ""))
+
+
+@app.get("/come-funziona")
+def come_funziona():
+    limite, modo = limite_debito()
+    return render_template("come_funziona.html", prodotti=prodotti(), limite=limite, limite_modo=modo)
 
 
 # --------------------------------------------------------------------------
@@ -929,19 +1261,22 @@ def testo_email_avviso(p, cred, indirizzo):
 
 
 def spedisci(messaggi):
-    """messaggi = [(destinatario, oggetto, corpo)]. Ritorna (inviati, errori)."""
+    """messaggi = [(destinatario, oggetto, corpo)] oppure con un quarto elemento:
+    la lista degli allegati [(nome_file, byte, tipo, sottotipo)]. Ritorna (inviati, errori)."""
     if not messaggi:
         return 0, []
     inviati, errori = 0, []
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
         server.starttls()
         server.login(SMTP_USER, SMTP_PASSWORD)
-        for dest, oggetto, corpo in messaggi:
+        for dest, oggetto, corpo, *altro in messaggi:
             msg = EmailMessage()
             msg["From"] = f"{NOME_APP} <{SMTP_USER}>"
             msg["To"] = dest
             msg["Subject"] = oggetto
             msg.set_content(corpo)
+            for nome_file, dati, tipo, sottotipo in (altro[0] if altro else []):
+                msg.add_attachment(dati, maintype=tipo, subtype=sottotipo, filename=nome_file)
             try:
                 server.send_message(msg)
                 inviati += 1
@@ -976,28 +1311,120 @@ def invia_avvisi(con, indirizzo, solo_se_dovuto=True):
     return esito
 
 
-def _avvisi_in_sottofondo(indirizzo):
-    con = connetti()
+# --------------------------------------------------------------------------
+# Backup settimanale per email agli amministratori
+# --------------------------------------------------------------------------
+def copia_database(con):
+    """Copia completa e coerente del database, come byte (si può fare mentre l'app lavora)."""
+    fd, percorso = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     try:
-        invia_avvisi(con, indirizzo)
-    except Exception:
-        app.logger.exception("Invio avvisi del lunedì non riuscito")
+        dest = sqlite3.connect(percorso)
+        con.backup(dest)
+        dest.close()
+        with open(percorso, "rb") as f:
+            return f.read()
     finally:
-        con.close()
+        os.unlink(percorso)
+
+
+def destinatari_backup(con):
+    return con.execute("SELECT * FROM persone WHERE admin=1 AND attivo=1 AND speciale=0 "
+                       "AND email<>'' ORDER BY nome, cognome").fetchall()
+
+
+def testo_email_backup(p, ora, negativi, file_excel, file_db):
+    lingua = p["lingua"] if p["lingua"] in LINGUE else "it"
+    t = lambda chiave, /, **kw: traduci(chiave, lingua, **kw)
+    oggetto = t("{app}: backup del {data}", app=NOME_APP, data=f"{ora:%d/%m/%Y}")
+    corpo = "\n".join([
+        t("Ciao {nome},", nome=p["nome"]), "",
+        t("ecco il backup settimanale di {app}, con i dati aggiornati al {quando}.",
+          app=NOME_APP, quando=f"{ora:%d/%m/%Y %H:%M}"), "",
+        t("In allegato:"),
+        t("- {file}: saldi, movimenti e approvazioni, da aprire con Excel;", file=file_excel),
+        t("- {file}: il database completo, serve per rimettere in piedi l'app.", file=file_db), "",
+        t("In negativo adesso: {n} persone, per un totale di {totale}.", n=len(negativi),
+          totale=euro(-sum(x["saldo"] for x in negativi), segno=False)), "",
+        t("Conserva questa email: se l'account PythonAnywhere si perde, con il file .db si ripristina tutto (guida, «Ripristino da un backup»)."),
+        t("Contiene i dati del gruppo e i PIN cifrati: non inoltrarla."), "",
+        t("Arriva ogni lunedì agli amministratori che hanno l'email nel Profilo."), "",
+    ])
+    return oggetto, corpo
+
+
+def invia_backup(solo_se_dovuto=True):
+    """Manda l'Excel e il database agli amministratori che hanno l'email.
+    Con solo_se_dovuto, al massimo una volta a settimana (dal lunedì alle 8).
+    Ritorna l'esito, oppure None se non c'era niente da fare."""
+    con = db()
+    settimana = settimana_corrente()
+    dest = destinatari_backup(con)
+    if not dest:
+        return None if solo_se_dovuto else {"destinatari": [], "inviati": 0, "errori": []}
+    with con:   # "prenota" la settimana: se due richieste arrivano insieme, ne parte uno solo
+        preso = con.execute("UPDATE impostazioni SET valore=? WHERE chiave='backup_settimana' "
+                            "AND valore<>?", (settimana, settimana)).rowcount
+    if solo_se_dovuto and not preso:
+        return None
+    ora = datetime.now(TZ)
+    file_excel, file_db = f"caffe_{ora:%Y-%m-%d}.xlsx", f"caffe_backup_{ora:%Y-%m-%d}.db"
+    dati_db = copia_database(con)
+    negativi = [x for x in saldi_persone(con) if x["saldo"] < 0]
+    excel, messaggi = {}, []
+    for p in dest:
+        lingua = p["lingua"] if p["lingua"] in LINGUE else "it"
+        if lingua not in excel:
+            excel[lingua] = crea_excel(con_approvazioni=True, lingua=lingua)
+        messaggi.append((p["email"], *testo_email_backup(p, ora, negativi, file_excel, file_db),
+                         [(file_excel, excel[lingua], *TIPO_XLSX.split("/")),
+                          (file_db, dati_db, "application", "octet-stream")]))
+    esito = {"quando": adesso(), "settimana": settimana,
+             "destinatari": [nome_completo(p) for p in dest], "inviati": 0, "errori": []}
+    try:
+        esito["inviati"], esito["errori"] = spedisci(messaggi)
+    except Exception as e:   # credenziali sbagliate, rete, …
+        esito["errori"] = [f"{type(e).__name__}: {e}"]
+    with con:
+        con.execute("UPDATE impostazioni SET valore=? WHERE chiave='backup_esito'",
+                    (json.dumps(esito, ensure_ascii=False),))
+    return esito
+
+
+def _lavori_del_lunedi(indirizzo, avvisi, backup):
+    """Avvisi a chi è in negativo e backup agli admin, dopo aver già risposto all'utente."""
+    with app.app_context():
+        if avvisi:
+            try:
+                invia_avvisi(db(), indirizzo)
+            except Exception:
+                app.logger.exception("Invio avvisi del lunedì non riuscito")
+        if backup:
+            try:
+                invia_backup()
+            except Exception:
+                app.logger.exception("Backup del lunedì non riuscito")
 
 
 @app.after_request
-def avvisi_automatici(risposta):
-    """Senza attività pianificate: il primo accesso dopo lunedì alle 8 fa partire le email,
-    dopo aver già risposto all'utente (così non deve aspettare)."""
+def lavori_automatici(risposta):
+    """Senza attività pianificate: la prima pagina aperta dopo lunedì alle 8 fa partire
+    le email (avvisi e backup), dopo aver già risposto all'utente (così non deve aspettare)."""
     try:
         if email_configurata() and request.endpoint not in (None, "static"):
-            r = db().execute("SELECT valore FROM impostazioni WHERE chiave='avviso_settimana'").fetchone()
-            if r and r["valore"] != settimana_corrente():
+            settimana = settimana_corrente()
+            r = db().execute("""SELECT
+                (SELECT valore FROM impostazioni WHERE chiave='avviso_settimana') AS avvisi,
+                (SELECT valore FROM impostazioni WHERE chiave='backup_settimana') AS backup,
+                EXISTS (SELECT 1 FROM persone WHERE admin=1 AND attivo=1 AND speciale=0
+                        AND email<>'') AS admin_con_email""").fetchone()
+            avvisi = r["avvisi"] is not None and r["avvisi"] != settimana
+            backup = bool(r["admin_con_email"]) and r["backup"] is not None and r["backup"] != settimana
+            if avvisi or backup:
                 indirizzo = os.environ.get("CAFFE_URL") or url_for("home", _external=True)
-                risposta.call_on_close(lambda: _avvisi_in_sottofondo(indirizzo))
+                risposta.call_on_close(lambda: _lavori_del_lunedi(indirizzo, avvisi, backup))
     except Exception:
-        app.logger.exception("Controllo avvisi non riuscito")
+        app.logger.exception("Controllo email del lunedì non riuscito")
     return risposta
 
 
@@ -1016,6 +1443,24 @@ def cron_avvisi():
 @app.get("/export.xlsx")
 @login_richiesto
 def export_excel():
+    nome_file = f"caffe_{datetime.now(TZ):%Y-%m-%d}.xlsx"
+    return send_file(io.BytesIO(crea_excel(con_approvazioni=bool(g.utente["admin"]))),
+                     as_attachment=True, download_name=nome_file, mimetype=TIPO_XLSX)
+
+
+TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def crea_excel(con_approvazioni=False, lingua=None):
+    """Il file Excel (saldi, movimenti e, per gli admin, approvazioni) come byte.
+    Funziona anche fuori da una pagina (backup del lunedì), nella lingua indicata."""
+    if lingua:
+        prima = g.get("lingua")
+        g.lingua = lingua
+        try:
+            return crea_excel(con_approvazioni)
+        finally:
+            g.lingua = prima
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
 
@@ -1077,21 +1522,64 @@ def export_excel():
     for c in ws2["D"]:
         c.alignment = Alignment(wrap_text=False)
 
+    if con_approvazioni:
+        accessi, spese, pagamenti, nomi, _ids = registro_dati(limite=100000)
+        ws3 = wb.create_sheet(_("Approvazioni"))
+        ws3.append([_("Data e ora"), _("Tipo"), _("Richiesta da"), _("Descrizione"), _("Importo (€)"),
+                    _("Esito"), _("Deciso da"), _("Data decisione")])
+        esiti = {"approvata": _("approvata"), "rifiutata": _("rifiutata"), "annullata": _("annullata dal richiedente")}
+        for r in spese + pagamenti:
+            ws3.append([da_iso(r["ts"]).astimezone(TZ).strftime("%d/%m/%Y %H:%M"),
+                        _("Spesa") if r["tipo"] == "spesa" else _("Pagamento"),
+                        nomi.get(r["richiedente_id"], "?"), descrivi_richiesta(r), r["importo_cent"] / 100,
+                        esiti.get(r["stato"], r["stato"]), nomi.get(r["deciso_da"], ""),
+                        da_iso(r["deciso_ts"]).astimezone(TZ).strftime("%d/%m/%Y %H:%M") if r["deciso_ts"] else ""])
+        for a in accessi:
+            ws3.append([da_iso(a["ts"]).astimezone(TZ).strftime("%d/%m/%Y %H:%M"), _("Accesso"),
+                        a["richiesto"], a["account"] and _("per l'account «{nome}»", nome=a["account"]) or _("nuovo account"),
+                        None, _(a["esito"]), nomi.get(a["deciso_da"], _("console")),
+                        da_iso(a["ts"]).astimezone(TZ).strftime("%d/%m/%Y %H:%M")])
+        for riga in ws3.iter_rows():
+            for c in riga:
+                c.font = font
+        for c in ws3[1]:
+            c.font, c.fill = bold, grigio
+        for col, w in zip("ABCDEFGH", (17, 12, 20, 50, 12, 22, 20, 17)):
+            ws3.column_dimensions[col].width = w
+        ws3.freeze_panes = "A2"
+
     buf = io.BytesIO()
     wb.save(buf)
-    buf.seek(0)
-    nome_file = f"caffe_{datetime.now(TZ):%Y-%m-%d}.xlsx"
-    return send_file(buf, as_attachment=True, download_name=nome_file,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return buf.getvalue()
 
 
 @app.get("/qr")
 @login_richiesto
 def qr():
     import segno
-    indirizzo = os.environ.get("CAFFE_URL") or url_for("home", _external=True)
-    svg = segno.make(indirizzo, error="m").svg_inline(scale=12, border=2, dark="#2b1d14")
-    return render_template("qr.html", svg=svg, indirizzo=indirizzo, prodotti=prodotti())
+    from urllib.parse import urlparse
+    indirizzo = indirizzo_qr()
+    # viewBox (omitsize) così il QR si ridimensiona sempre intero, a schermo e in stampa
+    svg = segno.make(indirizzo, error="m").svg_inline(scale=12, border=2, dark="#2b1d14", omitsize=True)
+    # se il QR porta a un indirizzo diverso da quello che si sta usando (es. CAFFE_URL sbagliato), avvisa
+    diverso = urlparse(indirizzo).netloc.lower() != request.host.lower()
+    return render_template("qr.html", svg=svg, indirizzo=indirizzo, prodotti=prodotti(),
+                           diverso=diverso, host_attuale=request.host)
+
+
+def indirizzo_qr():
+    return os.environ.get("CAFFE_URL") or url_for("home", _external=True)
+
+
+@app.get("/qr.png")
+@login_richiesto
+def qr_png():
+    """Il QR come immagine: si può salvare, stampare o mettere in un documento (funziona anche dall'icona su iPhone)."""
+    import segno
+    buf = io.BytesIO()
+    segno.make(indirizzo_qr(), error="m").save(buf, kind="png", scale=20, border=3, dark="#2b1d14")
+    buf.seek(0)
+    return send_file(buf, mimetype="image/png", download_name="qr-caffe-lab.png", as_attachment=False)
 
 
 # --------------------------------------------------------------------------
@@ -1104,10 +1592,20 @@ def admin():
     r = db().execute("SELECT valore FROM impostazioni WHERE chiave='avviso_esito'").fetchone()
     esito = json.loads(r["valore"]) if r and r["valore"] else None
     persone_neg = [p for p in saldi_persone(db()) if p["saldo"] < 0]
+    r = db().execute("SELECT valore FROM impostazioni WHERE chiave='backup_esito'").fetchone()
+    esito_backup = json.loads(r["valore"]) if r and r["valore"] else None
+    admin_attivi = [p for p in righe if p["admin"] and p["attivo"] and not p["speciale"]]
     return render_template("admin.html", righe=righe, prodotti=prodotti(solo_attivi=False),
+                           esito_backup=esito_backup,
+                           backup_a=[nome_completo(p) for p in admin_attivi if p["email"]],
+                           backup_senza_email=[nome_completo(p) for p in admin_attivi if not p["email"]],
                            conti=[r for r in righe if r["speciale"]], esito=esito,
                            email_attiva=email_configurata(), smtp_user=SMTP_USER,
                            n_negativo=len(persone_neg),
+                           limite=limite_debito()[0], limite_modo=limite_debito()[1],
+                           n_oltre=sum(1 for p in persone_neg
+                                       if limite_debito()[0] and p["saldo"] < -limite_debito()[0]),
+                           n_da_approvare=conta_da_fare(g.utente),
                            n_senza_email=sum(1 for p in persone_neg if not p["email"]),
                            manutenzioni=manutenzioni_con_stato(solo_attive=False),
                            storico_manutenzioni=db().execute("""
@@ -1169,6 +1667,24 @@ def admin_manutenzione(mid):
     return redirect(url_for("admin"))
 
 
+@app.post("/admin/limite")
+@admin_richiesto
+def admin_limite():
+    testo = request.form.get("limite", "").strip()
+    cent = 0 if testo.strip("0,.€ ") == "" else leggi_euro(testo)
+    if cent is None:
+        flash(_("Limite non valido (es. 10 oppure 7,50; 0 = nessun limite)."), "errore")
+        return redirect(url_for("admin"))
+    modo = "blocca" if request.form.get("modo") == "blocca" else "avvisa"
+    with db():
+        imposta("limite_debito_cent", cent)
+        imposta("limite_modo", modo)
+    flash(_("Limite di debito tolto.") if not cent else
+          _("Limite di debito: {limite} ({modo}).", limite=euro(cent, segno=False),
+            modo=_("blocca gli acquisti") if modo == "blocca" else _("avvisa e chiede conferma")), "ok")
+    return redirect(url_for("admin"))
+
+
 @app.post("/admin/avvisi/prova")
 @admin_richiesto
 def admin_avvisi_prova():
@@ -1204,6 +1720,22 @@ def admin_avvisi_invia():
           + (" " + _("Errori: {errori}", errori="; ".join(esito["errori"])) if esito["errori"] else ""),
           "errore" if esito["errori"] else "ok")
     return redirect(url_for("admin"))
+
+
+@app.post("/admin/backup/invia")
+@admin_richiesto
+def admin_backup_invia():
+    if not email_configurata():
+        flash(_("Email non configurata: vedi la guida."), "errore")
+        return redirect(url_for("admin") + "#backup")
+    esito = invia_backup(solo_se_dovuto=False)
+    if not esito["destinatari"]:
+        flash(_("Nessun amministratore ha l'email: aggiungi la tua nel Profilo."), "errore")
+    elif esito["errori"]:
+        flash(_("Invio non riuscito: {errore}", errore="; ".join(esito["errori"])), "errore")
+    else:
+        flash(_("Backup inviato a: {nomi}", nomi=", ".join(esito["destinatari"])), "ok")
+    return redirect(url_for("admin") + "#backup")
 
 
 def _leggi_prodotto_da_form():
@@ -1347,16 +1879,7 @@ def admin_acquisto_per():
 @admin_richiesto
 def admin_backup():
     """Scarica una copia completa del database (da conservare ogni tanto)."""
-    import tempfile
-    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    tmp.close()
-    dest = sqlite3.connect(tmp.name)
-    db().backup(dest)
-    dest.close()
-    with open(tmp.name, "rb") as f:
-        dati = f.read()
-    os.unlink(tmp.name)
-    return send_file(io.BytesIO(dati), as_attachment=True,
+    return send_file(io.BytesIO(copia_database(db())), as_attachment=True,
                      download_name=f"caffe_backup_{datetime.now(TZ):%Y-%m-%d}.db",
                      mimetype="application/octet-stream")
 

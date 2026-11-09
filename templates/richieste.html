@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Richieste') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ _('Richieste') }}</h1>
+
+{% if accessi %}
+<section class="scheda">
+  <h2>🔑 {{ _('Nuovi accessi da approvare') }}</h2>
+  <p class="aiuto">{{ _('Approva solo se sai chi è: chi viene approvato può segnare acquisti e pagamenti.') }}</p>
+  <ul class="lista">
+    {% for p in accessi %}
+    <li class="richiesta">
+      <div>
+        <div class="forte">
+          {% if p.nuovo_account %}{{ p|nome }} <span class="etichetta">{{ _('nuovo account') }}</span>
+          {% else %}{{ (p.nuovo_nome ~ ' ' ~ p.nuovo_cognome)|trim }} <span class="piccolo">{{ _("per l'account «{nome}»", nome=p|nome) }}</span>{% endif %}
+        </div>
+        <div class="piccolo">{{ p.richiesta_ts|ora if p.richiesta_ts }}{% if p.email %} · {{ p.email }}{% endif %}</div>
+      </div>
+      <div class="bottoni">
+        <form method="post" action="{{ url_for('admin_accesso', pid=p.id, azione='approva') }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <button class="btn piccolo-btn" type="submit">✔ {{ _('Approva') }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_accesso', pid=p.id, azione='rifiuta') }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <button class="btn secondario piccolo-btn" type="submit" data-conferma="{{ _('Rifiutare questa richiesta di accesso?') }}">✖ {{ _('Rifiuta') }}</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="scheda">
+  <h2>✅ {{ _('Da confermare') }}</h2>
+  {% if not da_decidere %}<p class="aiuto">{{ _('Niente da confermare.') }}</p>{% else %}
+  <ul class="lista">
+    {% for r in da_decidere %}
+    <li class="richiesta{% if r.id in vecchie %} vecchia{% endif %}">
+      <div>
+        <div>{{ r|richiesta }}</div>
+        <div class="piccolo">
+          {{ r.ts|ora }}
+          {% if r.tipo == 'pagamento' and r.controparte_id != utente.id %} · {{ _('in attesa di {nome}', nome=nomi.get(r.controparte_id, '?')) }}{% endif %}
+          {% if r.id in vecchie %} · <span class="neg">{{ _('ferma da più di 3 giorni') }}</span>{% endif %}
+          {% if r.foto %} · <a href="{{ url_for('scontrino', rid=r.id) }}" target="_blank">🧾 {{ _('scontrino') }}</a>{% endif %}
+        </div>
+        {% if r.tipo == 'pagamento' and r.controparte_id == utente.id %}
+        <div class="piccolo">{{ _('Conferma solo se hai davvero ricevuto i soldi: il tuo saldo scenderà di {importo}.', importo=r.importo_cent|euro(false)) }}</div>
+        {% endif %}
+      </div>
+      <div class="lato">
+        <div class="importo {% if r.tipo == 'spesa' %}pos{% endif %}">{{ r.importo_cent|euro(false) }}</div>
+        <div class="bottoni">
+          <form method="post" action="{{ url_for('decidi_richiesta', rid=r.id, azione='approva') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn piccolo-btn" type="submit">✔ {{ _('Conferma') }}</button>
+          </form>
+          <form method="post" action="{{ url_for('decidi_richiesta', rid=r.id, azione='rifiuta') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="btn secondario piccolo-btn" type="submit" data-conferma="{{ _('Rifiutare questa richiesta?') }}">✖ {{ _('Rifiuta') }}</button>
+          </form>
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="scheda">
+  <h2>⏳ {{ _('Le mie richieste in attesa') }}</h2>
+  {% if not mie %}<p class="aiuto">{{ _('Nessuna richiesta in attesa.') }}</p>{% else %}
+  <ul class="lista">
+    {% for r in mie %}
+    <li class="richiesta">
+      <div>
+        <div>{{ r|richiesta }}</div>
+        <div class="piccolo">{{ r.ts|ora }} · {% if r.tipo == 'spesa' %}{{ _("aspetta l'ok di un amministratore") }}{% else %}{{ _('aspetta la conferma di {nome}', nome=nomi.get(r.controparte_id, '?')) }}{% endif %}</div>
+      </div>
+      <div class="lato">
+        <div class="importo">{{ r.importo_cent|euro(false) }}</div>
+        <form method="post" action="{{ url_for('decidi_richiesta', rid=r.id, azione='annulla') }}">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <button class="link-btn" type="submit">{{ _('Annulla') }}</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% if utente.admin %}<p class="aiuto centro"><a href="{{ url_for('admin_registro') }}">🗂 {{ _('Registro approvazioni') }}</a></p>{% endif %}
+<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

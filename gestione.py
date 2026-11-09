@@ -75,7 +75,17 @@ def elenco():
 def imposta_admin(pid):
     con = connetti()
     with con:
-        n = con.execute("UPDATE persone SET admin=1 WHERE id=? AND speciale=0", (pid,)).rowcount
+        p = con.execute("SELECT * FROM persone WHERE id=?", (pid,)).fetchone()
+        if p and p["pin_hash"] and not p["approvato"]:     # resta traccia: approvato da console
+            richiesto = f"{p['nuovo_nome']} {p['nuovo_cognome']}".strip() or f"{p['nome']} {p['cognome']}".strip()
+            con.execute("INSERT INTO registro_accessi (ts, persona_id, account, richiesto, email, nuovo, "
+                        "esito, deciso_da) VALUES (?,?,?,?,?,?, 'approvato', NULL)",
+                        (adesso(), pid, "" if p["nuovo_account"] else f"{p['nome']} {p['cognome']}".strip(),
+                         richiesto, p["email"], p["nuovo_account"]))
+        n = con.execute("UPDATE persone SET admin=1, approvato=1, "
+                        "nome = CASE WHEN nuovo_nome<>'' THEN nuovo_nome ELSE nome END, "
+                        "cognome = CASE WHEN nuovo_nome<>'' THEN nuovo_cognome ELSE cognome END, "
+                        "nuovo_nome='', nuovo_cognome='' WHERE id=? AND speciale=0", (pid,)).rowcount
     print("Fatto." if n else "Id non trovato (o è un conto senza accesso). Usa: python3 gestione.py elenco")
 
 

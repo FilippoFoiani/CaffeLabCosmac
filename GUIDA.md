@@ -111,9 +111,11 @@ Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSG
 
 - **Acquisto**: per ogni prodotto ci sono − e +; si sceglie la quantità di ciascuno e si tocca **Conferma** una volta sola. Il pulsante mostra quanto va a proprio carico (l'acqua per la macchinetta va sul Conto Caffè). Per 10 minuti si può annullare l'intero acquisto.
 - **Pagamenti tra persone**:
-  - *Ho dato dei soldi a qualcuno*: se dai 5 € a chi è in credito, il tuo saldo sale di 5 € e il suo scende di 5 €.
-  - *Mi prendo il debito di qualcuno*: ti accolli una parte del debito di un altro (come Massi con Martin sul foglio).
-- **Ho comprato per il gruppo**: chi compra caffè o cialde registra la spesa e riceve il credito.
+  - *Ho dato dei soldi a qualcuno*: se dai 5 € a chi è in credito, il tuo saldo sale di 5 € e il suo scende di 5 €. **Conta solo quando chi ha ricevuto i soldi conferma** dalla pagina *Richieste* (per la Cassa conferma un amministratore).
+  - *Mi prendo il debito di qualcuno*: ti accolli una parte del debito di un altro (come Massi con Martin sul foglio). Vale subito, perché pesa solo su di te.
+- **Ho comprato per il gruppo**: chi compra caffè o cialde registra la spesa, anche con la foto dello scontrino. **Il credito arriva quando un amministratore la approva.**
+- **Richieste**: qui ognuno conferma i pagamenti ricevuti e vede le proprie richieste in attesa (che può annullare). Gli amministratori vedono anche spese e nuovi accessi da approvare; in cima alla pagina principale compare un avviso quando c'è qualcosa da fare.
+- **Come funziona**: pagina con le regole, come rientrare dal debito e le linee guida per la pulizia. Si apre anche senza aver fatto l'accesso: puoi mandarne il link a chi deve iniziare.
 - **Saldi di tutti**: visibili a tutti, con il pulsante per scaricare l'**Excel** (fogli *Saldi* e *Movimenti*).
 - **Avviso del lunedì**: se il saldo è negativo, dal lunedì compare il riquadro rosso con tre pulsanti:
   - *Salda il debito*: apre «Pagamenti tra persone» già compilato con l'importo del debito e la Cassa;
@@ -127,13 +129,17 @@ Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSG
 
 Per l'amministratore:
 
+- **Nuovi accessi**: il primo accesso di ogni persona (e ogni nuova registrazione) resta in attesa finché un amministratore non lo approva da *Richieste*. Se qualcuno attiva l'account di un altro, rifiutalo: l'account torna libero per il vero proprietario. Chi era già entrato prima di questo aggiornamento resta attivo.
+- **Registro approvazioni** (*Amministrazione → Registro approvazioni*, solo admin): per ogni accesso, spesa e pagamento approvato, rifiutato o annullato mostra chi l'ha chiesto, chi ha deciso e quando, con lo scontrino se c'è. Lo storico completo è anche nel foglio *Approvazioni* dell'Excel, che compare solo quando lo scarica un admin. Le spese e i pagamenti registrati direttamente da un admin compaiono come "registrata direttamente dall'admin". Gli accessi approvati prima di questo aggiornamento non sono nel registro.
+- **Limite di debito**: in *Amministrazione* scegli l'importo (0 = nessun limite) e cosa succede oltre il limite: *avvisa e chiedi conferma* (consigliato) oppure *blocca gli acquisti*. Chi è oltre il limite vede un avviso rosso fisso.
 - **Manutenzione della macchinetta**: in *Amministrazione* ci sono i promemoria (all'inizio due esempi, *Pulizia della macchinetta* ogni 7 giorni e *Decalcificazione* ogni 30: cambiali, eliminali o aggiungine altri). Si imposta ogni quanti giorni e quando è stata fatta l'ultima volta. Quando scade, **solo gli amministratori** vedono un riquadro giallo in cima alla pagina principale; chi la fa tocca **Fatta** e il conteggio riparte. Resta lo storico di chi l'ha fatta e quando.
+- **Backup settimanale**: ogni lunedì dalle 8:00 gli amministratori che hanno l'email nel *Profilo* ricevono un'email con due allegati: l'**Excel** (saldi, movimenti, approvazioni) e il **database completo** (`caffe_backup_AAAA-MM-GG.db`), che serve per il ripristino. Il primo parte subito dopo l'aggiornamento che lo introduce. In *Amministrazione → Backup settimanale* vedi chi lo riceve, l'esito dell'ultimo invio e il pulsante **Invia il backup adesso**. Serve che le email siano configurate (passo 4). L'email contiene i dati del gruppo e i PIN cifrati: non inoltrarla.
 - Inoltre si possono cambiare prezzi e nomi dei prodotti, aggiungerne di nuovi o disattivarli, scegliere se un prodotto lo paga chi lo prende o un conto comune, segnare acquisti per conto di qualcuno, fare rettifiche e versamenti, aggiungere persone e scaricare il backup.
 
 ## Manutenzione
 
 - **Ogni mese**: il piano gratuito spegne la web app se non viene rinnovata. Entra nella scheda **Web** e premi il pulsante per estenderla (*Run until 1 month from today*). Conviene mettersi un promemoria.
-- **Backup**: ogni tanto scarica *Amministrazione → Backup* e conservalo.
+- **Backup**: arriva da solo ogni lunedì per email agli amministratori (vedi sopra). Conserva quelle email, magari in una cartella apposta. In qualsiasi momento puoi anche scaricarlo da *Amministrazione → Backup*.
 - **Aggiornare l'app** (nuova versione dello zip) senza perdere niente: persone, saldi e movimenti stanno solo in `dati/`, che lo zip non contiene mai.
   1. *Amministrazione → Backup* (per prudenza);
   2. scheda **Files** → carica il nuovo `caffe-lab.zip` nella cartella principale;
@@ -142,6 +148,25 @@ Per l'amministratore:
   Al riavvio l'app aggiunge da sola le tabelle e le colonne nuove al database. **Non** rilanciare `gestione.py importa`. Il file WSGI non viene toccato.
   Se avevi già installato una versione precedente, i saldi del nuovo file aggiungili da *Amministrazione → Rettifica*, oppure ricomincia da zero: cancella la cartella `dati/` **solo se** nell'app non c'è ancora niente di importante, poi rifai l'import.
 - Se qualcosa non va: nella scheda Web c'è il link all'**error log**.
+
+### Ripristino da un backup
+
+Serve solo se l'account PythonAnywhere si perde o il database si rovina.
+
+1. Se l'account è nuovo, rifai i passi 1, 2 e 3 (account, file, web app e file WSGI), ma **non** fare il passo 0 (`gestione.py importa`).
+2. Prendi il file `.db` più recente dalle email del backup e caricalo dalla scheda **Files** nella cartella principale.
+3. **Consoles → Bash** (cambia la data con quella del tuo file):
+
+```bash
+mkdir -p ~/caffe-lab/dati
+mv ~/caffe_backup_2026-11-16.db ~/caffe-lab/dati/caffe.db
+touch /var/www/*_wsgi.py && echo "OK: ripristinato"
+```
+
+4. Apri l'app: saldi, movimenti, persone, PIN e amministratori sono come al momento del backup. Se l'account è nuovo, ognuno rientra una volta con nome e PIN.
+5. Se l'indirizzo è cambiato (nuovo nome utente), aggiorna `CAFFE_URL` nel file WSGI e ristampa il QR.
+
+Le foto degli scontrini non sono nel backup: restano solo su PythonAnywhere.
 
 ## Provarla sul proprio PC (facoltativo)
 

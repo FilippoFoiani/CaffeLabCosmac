@@ -3,8 +3,15 @@
 <section class="saldo-box">
   <div class="saluto">{{ _('Ciao {nome}', nome=utente.nome) }}</div>
   <div class="saldo {% if saldo < 0 %}neg{% elif saldo > 0 %}pos{% endif %}">{{ saldo|euro }}</div>
-  <div class="sotto">{% if saldo < 0 %}{{ _('il tuo debito') }}{% elif saldo > 0 %}{{ _('il tuo credito') }}{% else %}{{ _('sei in pari') }}{% endif %}</div>
+  <div class="sotto">{% if saldo < 0 %}{{ _('il tuo debito') }} · <a href="{{ url_for('come_funziona') }}#debito">{{ _('come rientrare') }} →</a>{% elif saldo > 0 %}{{ _('il tuo credito') }}{% else %}{{ _('sei in pari') }}{% endif %}</div>
 </section>
+
+{% if da_fare %}
+<a class="avviso-richieste" href="{{ url_for('richieste') }}">📝 {{ _('Hai {n} richieste da confermare', n=da_fare) if da_fare > 1 else _('Hai 1 richiesta da confermare') }} →</a>
+{% endif %}
+{% if mie_in_attesa %}
+<a class="info-attesa" href="{{ url_for('richieste') }}">⏳ {{ _('{n} tue richieste in attesa di conferma', n=mie_in_attesa|length) if mie_in_attesa|length > 1 else _('1 tua richiesta in attesa di conferma') }}</a>
+{% endif %}
 
 {% if manutenzioni %}
 <section class="avviso-manutenzione" role="alert">
@@ -24,7 +31,11 @@
 
 {% if avviso %}
 <section class="avviso-lunedi" role="alert">
+  {% if avviso.oltre_limite %}
+  <div class="avviso-titolo">🚫 {{ _('Hai superato il limite di debito di {limite} · il tuo saldo è {saldo}', limite=limite|euro(false), saldo=saldo|euro) }}</div>
+  {% else %}
   <div class="avviso-titolo">📢 {{ _('Avviso del lunedì · il tuo saldo è {saldo}', saldo=saldo|euro) }}</div>
+  {% endif %}
   <p class="avviso-testo">{{ _('SALDA IL DEBITO, COMPRA IL CREDITO DI UN ALTRO UTENTE O COMPRA UNO DEI BENI') }}</p>
   <div class="avviso-azioni">
     {% if avviso.cassa %}<a class="btn" href="{{ url_for('paga', verso='dato', importo=avviso.importo, a=avviso.cassa) }}">💶 {{ _('Salda il debito') }}</a>{% endif %}
@@ -32,16 +43,22 @@
     <a class="btn" href="{{ url_for('spesa') }}">🛒 {{ _('Compra uno dei beni') }}</a>
   </div>
   {% if avviso.creditori %}<p class="piccolo">{{ _('In credito ora:') }} {% for c in avviso.creditori %}{{ c|nome }} ({{ c.saldo|euro }}){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% if not avviso.oltre_limite %}
   <form method="post" action="{{ url_for('avviso_letto') }}">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <button type="submit" class="link-btn">{{ _('Ho capito, nascondi fino a lunedì prossimo') }}</button>
   </form>
+  {% else %}
+  <p class="piccolo">{{ _('Questo avviso resta finché non torni sotto il limite.') }}</p>
+  {% endif %}
 </section>
 {% endif %}
 
 <form method="post" action="{{ url_for('acquista') }}" class="carrello" id="carrello"
       data-t-conferma="{{ _('Conferma') }}" data-t-scegli="{{ _('Scegli con il +') }}"
-      data-t-carico="{{ _('a tuo carico') }}" data-t-comune="{{ _('conto comune') }}">
+      data-t-carico="{{ _('a tuo carico') }}" data-t-comune="{{ _('conto comune') }}"
+      data-saldo="{{ saldo }}" data-limite="{{ limite }}" data-modo="{{ limite_modo }}"
+      data-t-bloccato="{{ _('Oltre il limite di debito: salda prima di prendere altro') }}">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <input type="hidden" name="nonce" value="{{ nonce }}">
   {% for pr in prodotti %}
@@ -59,6 +76,10 @@
     </div>
   </div>
   {% endfor %}
+  <label class="conferma-limite" id="conferma-limite" hidden>
+    <input type="checkbox" name="oltre_limite" value="1" id="oltre-limite">
+    {{ _('So di essere oltre il limite di debito di {limite}: segna comunque e salderò presto', limite=limite|euro(false)) }}
+  </label>
   <button type="submit" class="btn-caffe" id="conferma" disabled>
     <span id="riepilogo">{{ _('Scegli con il +') }}</span>
     <small id="totale">&nbsp;</small>
@@ -78,7 +99,9 @@
   <a href="{{ url_for('paga') }}"><span>💶</span>{{ _('Pagamenti tra persone') }}</a>
   <a href="{{ url_for('spesa') }}"><span>🛒</span>{{ _('Ho comprato per il gruppo') }}</a>
   <a href="{{ url_for('movimenti') }}"><span>🧾</span>{{ _('I miei movimenti') }}</a>
+  <a href="{{ url_for('richieste') }}"><span>📝</span>{{ _('Richieste') }}{% if da_fare %} <b class="badge">{{ da_fare }}</b>{% endif %}</a>
   <a href="{{ url_for('profilo') }}"><span>👤</span>{{ _('Profilo ed email') }}</a>
+  <a href="{{ url_for('come_funziona') }}"><span>❓</span>{{ _('Come funziona') }}</a>
   {% if utente.admin %}<a href="{{ url_for('admin') }}"><span>⚙️</span>{{ _('Amministrazione') }}</a>{% endif %}
 </nav>
 
@@ -108,6 +131,8 @@
     var btn = document.getElementById('conferma');
     var riep = document.getElementById('riepilogo');
     var tot = document.getElementById('totale');
+    var boxLimite = document.getElementById('conferma-limite');
+    var spunta = document.getElementById('oltre-limite');
     function euro(c) { return (c / 100).toFixed(2).replace('.', ',') + ' €'; }
     function aggiorna() {
       var parti = [], mio = 0, altri = 0;
@@ -121,8 +146,13 @@
           if (r.dataset.mio === '1') { mio += costo; } else { altri += costo; }
         }
       });
-      btn.disabled = parti.length === 0;
-      riep.textContent = parti.length ? T.tConferma + '  ' + parti.join('  ') : T.tScegli;
+      var limite = parseInt(T.limite, 10), oltre = limite > 0 && mio > 0 &&
+          parseInt(T.saldo, 10) - mio < -limite;
+      boxLimite.hidden = !(oltre && T.modo === 'avvisa');
+      spunta.required = oltre && T.modo === 'avvisa';
+      btn.disabled = parti.length === 0 || (oltre && T.modo === 'blocca');
+      riep.textContent = parti.length ? (oltre && T.modo === 'blocca' ? T.tBloccato
+                                         : T.tConferma + '  ' + parti.join('  ')) : T.tScegli;
       tot.textContent = parti.length
         ? T.tCarico + ' ' + euro(mio) + (altri ? ' · ' + T.tComune + ' ' + euro(altri) : '')
         : ' ';

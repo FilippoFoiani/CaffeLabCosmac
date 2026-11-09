@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Come funziona') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<div class="guida">
+<h1>❓ {{ _('Come funziona') }}</h1>
+
+<section class="scheda">
+  <h2>☕ {{ _('In breve') }}</h2>
+  <ol>
+    <li>{{ _("Inquadra il QR sulla macchinetta, oppure apri l'icona sulla schermata Home.") }}</li>
+    <li>{{ _('Tocca + su quello che prendi e poi Conferma. Puoi segnare più cose insieme.') }}</li>
+    <li>{{ _('Il costo viene scalato dal tuo saldo. Se sbagli, puoi annullare entro 10 minuti.') }}</li>
+  </ol>
+  <p class="aiuto">{% for pr in prodotti %}{{ pr.emoji }} {{ _(pr.nome) }} {{ pr.prezzo_cent|euro(false) }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+</section>
+
+<section class="scheda">
+  <h2>💶 {{ _('Il tuo saldo') }}</h2>
+  <ul>
+    <li><strong class="pos">{{ _('Saldo positivo') }}</strong> = {{ _('credito: hai messo più soldi di quelli che hai consumato.') }}</li>
+    <li><strong class="neg">{{ _('Saldo negativo') }}</strong> = {{ _('debito: hai consumato più di quello che hai pagato.') }}</li>
+    <li>{{ _("Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune del caffè.") }}</li>
+    <li>{{ _('Saldi e movimenti sono visibili a tutti, come sul foglio appeso al muro.') }}</li>
+  </ul>
+</section>
+
+<section class="scheda" id="debito">
+  <h2>🔁 {{ _('Come rientrare dal debito') }}</h2>
+  <ol>
+    <li><strong>{{ _('Salda il debito') }}</strong>: {{ _("metti i soldi nella cassa e registralo in «Pagamenti tra persone» → «Ho dato dei soldi a qualcuno» → Cassa. Conta quando un amministratore conferma.") }}</li>
+    <li><strong>{{ _('Compra il credito di un altro') }}</strong>: {{ _("dai i soldi a chi è in credito (lo vedi in «Saldi di tutti») e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.") }}</li>
+    <li><strong>{{ _('Compra uno dei beni') }}</strong>: {{ _("compra caffè, cialde, acqua o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Il credito arriva quando un amministratore approva.") }}</li>
+  </ol>
+</section>
+
+<section class="scheda">
+  <h2>📉 {{ _('Tieni basso il debito') }}</h2>
+  <p class="esortazione">{{ _("Caffè e acqua li ricompra chi anticipa i soldi: ogni euro di debito è un euro che un collega ha messo di tasca sua. Salda presto!") }}</p>
+  <ul>
+    <li>{{ _("Non aspettare l'avviso: salda appena arrivi a qualche euro di debito.") }}</li>
+    <li>{{ _("Ogni lunedì chi è in negativo riceve un avviso nell'app, e per email se l'ha inserita nel Profilo.") }}</li>
+    {% if limite %}
+    <li><strong>{{ _('Il limite di debito è {limite}.', limite=limite|euro(false)) }}</strong>
+      {% if limite_modo == 'blocca' %}{{ _("Oltre il limite l'app blocca gli acquisti finché non saldi.") }}
+      {% else %}{{ _("Oltre il limite compare un avviso fisso e ogni acquisto va confermato.") }}{% endif %}</li>
+    {% else %}
+    <li>{{ _("Per ora non c'è un limite di debito, ma un amministratore può impostarlo.") }}</li>
+    {% endif %}
+    <li>{{ _('Chi è in credito può «vendere» il suo credito: è il modo più semplice per pareggiare i conti senza passare dalla cassa.') }}</li>
+    <li>{{ _('Segna sempre tutto subito: un caffè non segnato lo paga qualcun altro.') }}</li>
+  </ul>
+</section>
+
+<section class="scheda">
+  <h2>🧹 {{ _('Pulizia: lascia la postazione come vorresti trovarla') }}</h2>
+  <ul>
+    <li>{{ _('Butta la cialda o la capsula usata, il bicchierino e la paletta nei rifiuti giusti.') }}</li>
+    <li>{{ _("Asciuga gocce e schizzi sul piano e sotto l'erogatore.") }}</li>
+    <li>{{ _('Lava e rimetti a posto tazzine e cucchiaini che usi.') }}</li>
+    <li>{{ _('Se la vaschetta delle capsule o quella di raccolta è piena, svuotala.') }}</li>
+    <li>{{ _("Se il serbatoio dell'acqua è quasi vuoto, riempilo con una bottiglia e segna «Acqua macchinetta».") }}</li>
+    <li>{{ _('Se manca qualcosa (caffè, zucchero, bicchierini) o la macchinetta segnala un problema, avvisa un amministratore.') }}</li>
+  </ul>
+</section>
+
+<section class="scheda">
+  <h2>🔒 {{ _('Regole per essere corretti con tutti') }}</h2>
+  <ul>
+    <li>{{ _('Il primo accesso di ogni persona viene approvato da un amministratore.') }}</li>
+    <li>{{ _('Spese e pagamenti tra persone contano solo dopo una conferma: nessuno può cambiare da solo il saldo di un altro.') }}</li>
+    <li>{{ _("Ogni movimento resta registrato con data e autore. Gli errori si correggono chiedendo a un amministratore.") }}</li>
+  </ul>
+</section>
+
+<section class="scheda">
+  <h2>💬 {{ _('Domande frequenti') }}</h2>
+  <ul>
+    <li><strong>{{ _('Ho cambiato telefono o dimenticato il PIN.') }}</strong> {{ _("Chiedi a un amministratore di azzerare il PIN: al prossimo accesso ne sceglierai uno nuovo.") }}</li>
+    <li><strong>{{ _('Ho segnato qualcosa per sbaglio.') }}</strong> {{ _('Tocca «Annulla» entro 10 minuti; dopo, chiedi a un amministratore.') }}</li>
+    <li><strong>{{ _("Posso usare l'app in inglese?") }}</strong> {{ _('Sì: tocca IT / EN in alto a destra.') }}</li>
+  </ul>
+</section>
+</div>
+<p class="aiuto centro"><a href="{{ url_for('home') if utente else url_for('accedi') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}

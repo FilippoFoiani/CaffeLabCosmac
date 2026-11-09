@@ -10,7 +10,8 @@
   <label class="scelta">
     <input type="radio" name="verso" value="dato" {% if form.get('verso', 'dato') == 'dato' %}checked{% endif %}>
     <span><strong>{{ _('Ho dato dei soldi a qualcuno') }}</strong>
-      <small>{{ _('Es. hai dato 5 € in contanti a chi è in credito: il tuo saldo sale, il suo scende.') }}</small></span>
+      <small>{{ _('Es. hai dato 5 € in contanti a chi è in credito: il tuo saldo sale, il suo scende.') }}
+        {% if not utente.admin %}<br>🔒 {{ _("Conta quando l'altra persona conferma di aver ricevuto i soldi (per la Cassa conferma un amministratore).") }}{% endif %}</small></span>
   </label>
   <label class="scelta">
     <input type="radio" name="verso" value="accollo" {% if form.get('verso') == 'accollo' %}checked{% endif %}>

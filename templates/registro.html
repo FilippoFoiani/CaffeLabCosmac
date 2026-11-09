@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Registro approvazioni') }} – {{ nome_app }}{% endblock %}
+{% macro esito(stato) -%}
+  {%- if stato in ('approvata', 'approvato') %}<span class="esito ok">✔ {{ _(stato) }}</span>
+  {%- elif stato == 'automatico' %}<span class="esito ok">✔ {{ _('automatico') }}</span>
+  {%- elif stato in ('rifiutata', 'rifiutato') %}<span class="esito no">✖ {{ _(stato) }}</span>
+  {%- else %}<span class="esito">↩ {{ _('annullata dal richiedente') }}</span>{% endif -%}
+{%- endmacro %}
+{% block contenuto %}
+<h1>🗂 {{ _('Registro approvazioni') }}</h1>
+<p class="aiuto">{{ _("Visibile solo agli amministratori: chi ha chiesto cosa, chi ha deciso e quando. Gli ultimi 300 per sezione; tutto lo storico è nel foglio «Approvazioni» dell'Excel.") }}</p>
+<p class="aiuto">
+  {% for codice, nome in [('', _('Tutto')), ('accessi', _('Accessi')), ('spese', _('Spese')), ('pagamenti', _('Pagamenti'))] %}
+    {% if sezione == codice %}<strong>{{ nome }}</strong>{% else %}<a href="{{ url_for('admin_registro', sezione=codice) if codice else url_for('admin_registro') }}">{{ nome }}</a>{% endif %}{% if not loop.last %} · {% endif %}
+  {% endfor %}
+</p>
+
+{% if sezione in ('', 'accessi') %}
+<section class="scheda">
+  <h2>🔑 {{ _('Accessi') }}</h2>
+  {% if not accessi %}<p class="aiuto">{{ _('Ancora nessuna decisione.') }}</p>{% else %}
+  <ul class="lista">
+    {% for a in accessi %}
+    <li class="registro">
+      <div>
+        <div class="forte">{{ a.richiesto }} <span class="piccolo">{% if a.nuovo %}{{ _('nuovo account') }}{% else %}{{ _("per l'account «{nome}»", nome=a.account) }}{% endif %}</span></div>
+        <div class="piccolo">{{ esito(a.esito) }} · {% if a.deciso_da %}{{ _('da {nome}', nome=nomi.get(a.deciso_da, '?')) }}{% else %}{{ _('da console') }}{% endif %} · {{ a.ts|ora }}{% if a.email %} · {{ a.email }}{% endif %}</div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}
+
+{% for codice, titolo, righe in [('spese', '🛒 ' ~ _('Spese per il gruppo'), spese), ('pagamenti', '💶 ' ~ _('Pagamenti tra persone'), pagamenti)] %}
+{% if sezione in ('', codice) %}
+<section class="scheda">
+  <h2>{{ titolo }}</h2>
+  {% if not righe %}<p class="aiuto">{{ _('Ancora nessuna decisione.') }}</p>{% else %}
+  <ul class="lista">
+    {% for r in righe %}
+    <li class="registro">
+      <div>
+        <div>{{ r|richiesta }}</div>
+        <div class="piccolo">
+          {{ esito(r.stato) }}
+          {% if r.stato != 'annullata' %}·
+            {% if r.deciso_da == r.richiedente_id %}{{ _("registrata direttamente dall'admin {nome}", nome=nomi.get(r.deciso_da, '?')) }}
+            {% elif r.deciso_da == r.controparte_id %}{{ _('da {nome}, che ha ricevuto i soldi', nome=nomi.get(r.deciso_da, '?')) }}
+            {% else %}{{ _('da {nome}', nome=nomi.get(r.deciso_da, '?')) }}{% if r.deciso_da in admin_ids %} (admin){% endif %}{% endif %}
+          {% endif %}
+          · {{ (r.deciso_ts or r.ts)|ora }}
+          {% if r.deciso_ts and r.deciso_ts[:10] != r.ts[:10] %} · {{ _('richiesta del {data}', data=r.ts|ora) }}{% endif %}
+          {% if r.foto %} · <a href="{{ url_for('scontrino', rid=r.id) }}" target="_blank">🧾 {{ _('scontrino') }}</a>{% endif %}
+        </div>
+      </div>
+      <div class="importo">{{ r.importo_cent|euro(false) }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}
+{% endfor %}
+<p class="aiuto centro"><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
+{% endblock %}

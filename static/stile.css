@@ -22,6 +22,8 @@
   }
 }
 * { box-sizing: border-box; }
+/* "hidden" deve vincere sempre (altrimenti display:flex delle classi lo annulla) */
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -218,3 +220,40 @@ details summary { cursor: pointer; font-weight: 700; color: var(--caffe); margin
 .campo-lavoro { font-weight: 700; }
 .riga-campi .piccolo { flex-shrink: 0; }
 .riga-campi input[type=date] { min-width: 0; }
+
+/* Richieste e approvazioni */
+.avviso-richieste { display: block; background: #eef4ff; border: 2px solid #3b6fd8; color: #173a7a;
+                    border-radius: var(--raggio); padding: 12px 14px; margin: 6px 0 14px;
+                    font-weight: 700; text-decoration: none; }
+.avviso-richieste.vuoto { background: var(--card); border-color: var(--bordo); color: var(--grigio); font-weight: 600; }
+@media (prefers-color-scheme: dark) { .avviso-richieste { background: #172544; color: #cfe0ff; } }
+.info-attesa { display: block; color: var(--grigio); font-size: 15px; margin: -4px 0 12px; text-decoration: none; }
+.badge { background: var(--rosso); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 13px; }
+.lista li.richiesta { align-items: flex-start; }
+.lista li.vecchia { background: rgba(192, 57, 43, .06); }
+.lato { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.bottoni { display: flex; gap: 6px; }
+.bottoni form { margin: 0; }
+.piccolo-btn { padding: 8px 10px; font-size: 14px; margin: 0; white-space: nowrap; }
+.conferma-limite { display: flex; gap: 10px; align-items: flex-start; background: #fdecea; border: 1px solid var(--rosso);
+                   border-radius: 12px; padding: 10px 12px; font-size: 15px; color: #5b1410; }
+.conferma-limite input { margin-top: 3px; }
+.icona-grande { font-size: 48px; }
+.scheda.centro { text-align: center; }
+input[type=file] { padding: 10px; }
+
+/* Come funziona */
+.guida h2 { margin-top: 0; }
+.guida ol, .guida ul { padding-left: 20px; margin: 6px 0; }
+.guida li { margin: 5px 0; }
+.guida .esortazione { background: #fdecea; border-left: 4px solid var(--rosso); padding: 10px 12px;
+                      border-radius: 8px; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .guida .esortazione { background: #3a1714; } }
+.lista li.richiesta { flex-direction: column; align-items: stretch; gap: 8px; }
+.lista li.richiesta .lato { flex-direction: row; justify-content: space-between; align-items: center; }
+
+/* Registro approvazioni */
+.esito { font-weight: 700; color: var(--grigio); }
+.esito.ok { color: var(--verde); }
+.esito.no { color: var(--rosso); }
+.lista li.registro { align-items: flex-start; }
