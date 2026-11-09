@@ -879,6 +879,55 @@ def test_magazzino():
     assert modulo.leggi_euro("0") is None and modulo.leggi_euro("0", consenti_zero=True) == 0
 
 
+def test_bilancio_magazzino():
+    """Issue #2: iniziale + comprati − consumati ± differenze = in magazzino, in pezzi e in euro; solo admin."""
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin/magazzino")
+    # articolo e prodotto nuovi, così i numeri sono quelli di questo test
+    admin.post("/admin/articolo/nuovo", data={"_csrf": toka, "nome": "Zucchero", "emoji": "🍬", "soglia": "0"})
+    admin.post("/admin/prodotto/nuovo", data={"_csrf": toka, "nome": "Dolcetto", "emoji": "🍭", "prezzo": "0,50"})
+    with app.app_context():
+        aid = modulo.db().execute("SELECT id FROM articoli WHERE nome='Zucchero'").fetchone()[0]
+        prid = modulo.db().execute("SELECT id FROM prodotti WHERE nome='Dolcetto'").fetchone()[0]
+        modulo.db().execute("INSERT INTO ricette VALUES (?,?,1)", (prid, aid))
+        modulo.db().commit()
+
+    def conta(n):
+        admin.post(f"/admin/articolo/{aid}", data={"_csrf": toka, "nome": "Zucchero", "emoji": "🍬",
+                                                  "soglia": "0", "contati": n, "attivo": "1"})
+    conta(10)                                                      # quantità di partenza
+    tok, html = csrf(admin, "/spesa")                              # 20 pezzi per 4 € = 0,20 € l'uno
+    admin.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"qta_{aid}": "20", f"costo_{aid}": "4"})
+    max_ = app.test_client()
+    entra(max_, "Max")
+    for qta in (5, 1):
+        tok, html = csrf(max_, "/")
+        max_.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prid}": qta})
+    with app.app_context():                                        # l'ultimo (1 pezzo) viene annullato
+        mid = modulo.db().execute("SELECT MAX(id) FROM movimenti WHERE prodotto_id=?", (prid,)).fetchone()[0]
+    max_.post(f"/annulla/{mid}", data={"_csrf": tok})
+    conta(22)                                                      # ne risultano 25: ne mancano 3
+    with app.app_context():
+        elenco, per_prod, totali = modulo.bilancio_magazzino()
+    z = next(x for x in elenco if x["articolo"]["id"] == aid)
+    assert (z["iniziale"], z["comprati"], z["consumati"], z["differenze"], z["giacenza"]) == (10, 20, 5, -3, 22)
+    assert z["costo_medio"] == 20
+    assert (z["valore_iniziale"], z["valore_comprati"], z["valore_consumati"],
+            z["valore_differenze"], z["valore_giacenza"]) == (200, 400, 100, -60, 440)
+    d = next(p for p in per_prod if p["prodotto"]["id"] == prid)
+    assert (d["pezzi"], d["incasso"], d["costo"], d["margine"]) == (5, 250, 100, 150)
+    assert (d["costo_unitario"], d["margine_unitario"]) == (20, 30)
+    # un articolo mai comprato non ha costo: i totali in euro restano «—» invece di essere sbagliati
+    bicchierini = next(x for x in elenco if x["articolo"]["codice"] == "bicchierini")
+    assert bicchierini["costo_medio"] is None and totali["valore_giacenza"] is None
+    pagina = admin.get("/admin/bilancio").get_data(as_text=True)
+    assert "Zucchero" in pagina and "Mancano 3 pezzi" in pagina and "+1,50 €" in pagina
+    assert max_.get("/admin/bilancio").status_code == 403
+    with app.app_context():
+        modulo.db().execute("UPDATE prodotti SET attivo=0 WHERE id=?", (prid,))
+        modulo.db().commit()
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

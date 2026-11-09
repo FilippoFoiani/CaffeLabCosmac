@@ -312,3 +312,12 @@ input[type=file] { padding: 10px; }
 .tabella-ricette th[scope=row] { text-align: left; white-space: nowrap; }
 .tabella-ricette input { width: 3.2em; text-align: center; }
 .tabella-ricette tr.spento { opacity: .6; }
+
+/* Bilancio del magazzino (solo admin) */
+.bilancio-articolo { padding-bottom: 8px; }
+.tabella-bilancio { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 15px; }
+.tabella-bilancio th, .tabella-bilancio td { padding: 5px 4px; border-top: 1px solid var(--bordo); }
+.tabella-bilancio thead th { border-top: 0; color: var(--grigio); font-size: 13px; font-weight: 600; text-align: right; }
+.tabella-bilancio th[scope=row] { text-align: left; font-weight: 400; }
+.tabella-bilancio td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tabella-bilancio tr.totale th, .tabella-bilancio tr.totale td { font-weight: 700; border-top: 2px solid var(--bordo); }

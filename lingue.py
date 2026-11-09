@@ -378,6 +378,39 @@ EN = {
     "Articolo aggiunto: {nome}. Inserisci quanti pezzi ci sono.": "Item added: {nome}. Enter how many pieces there are.",
     "Nelle ricette scrivi un numero di pezzi da 0 a 20.": "In the recipes, enter a number of pieces from 0 to 20.",
     "Ricette salvate: valgono per gli acquisti da ora in poi.": "Recipes saved: they apply to purchases from now on.",
+    # --- bilancio del magazzino ---
+    "Bilancio": "Balance sheet",
+    "Bilancio del magazzino": "Stock balance sheet",
+    "Bilancio: merce comprata, consumata e mancante, in euro": "Balance sheet: supplies bought, used and missing, in euros",
+    "Visibile solo agli amministratori.": "Visible to administrators only.",
+    "Conta tutto dalla prima volta che ogni articolo è stato contato. Gli euro sono calcolati al costo medio di un pezzo, cioè quanto è costato in media nelle spese approvate.":
+        "Everything counts from the first time each item was counted. Euros use the average cost of one piece, i.e. what it cost on average in the approved group purchases.",
+    "Ancora niente da mostrare: conta la merce in «Magazzino» e registra le spese con pezzi e costo.":
+        "Nothing to show yet: count the supplies in “Stock” and record group purchases with pieces and cost.",
+    "Merce comprata": "Supplies bought",
+    "Merce consumata": "Supplies used",
+    "In magazzino": "In stock",
+    "Differenze delle conte": "Count differences",
+    "costo sconosciuto": "unknown cost",
+    "Costo sconosciuto: nessuna spesa approvata con questo articolo": "Unknown cost: no approved group purchase with this item",
+    "costo medio {costo} al pezzo": "average cost {costo} per piece",
+    "Iniziale (prima conta)": "Starting (first count)",
+    "Comprati": "Bought",
+    "Consumati (segnati nell'app)": "Used (recorded in the app)",
+    "Mancano {n} pezzi rispetto a quelli segnati: probabilmente consumi non registrati.":
+        "{n} pieces are missing compared to what was recorded: probably unrecorded consumption.",
+    "Prodotti: incassi e costi": "Products: income and costs",
+    "Solo gli acquisti segnati da quando c'è il magazzino.": "Only purchases recorded since the stock was set up.",
+    "Il costo di un pezzo viene dalla ricetta (es. caffè = cialda + bicchierino) al costo medio.":
+        "The cost of one piece comes from the recipe (e.g. coffee = pod + cup) at average cost.",
+    "prezzo {prezzo}": "price {prezzo}",
+    "costo": "cost",
+    "margine": "margin",
+    "Pezzi presi": "Pieces taken",
+    "Incassato": "Income",
+    "Costo della merce": "Cost of supplies",
+    "Margine": "Margin",
+    "Il prezzo non copre il costo della merce: valuta di aumentarlo.": "The price doesn't cover the cost of the supplies: consider raising it.",
 
     # --- Excel ---
     "Saldo (€)": "Balance (€)",

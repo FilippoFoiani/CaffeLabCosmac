@@ -2266,6 +2266,90 @@ def admin_ricette():
     return redirect(url_for("admin_magazzino"))
 
 
+def bilancio_magazzino():
+    """Bilancio della merce dall'inizio del magazzino, per articolo e per prodotto.
+
+    Per ogni articolo, in pezzi e in euro (al costo medio delle spese approvate):
+        iniziale (prima conta) + comprati − consumati ± differenze delle conte = in magazzino
+    Le differenze sono i pezzi spariti (o trovati) tra il calcolo e la conta vera: di solito
+    consumi non segnati. Per ogni prodotto: quanto ha incassato e quanto è costata la sua merce."""
+    per_art = {a["id"]: {"articolo": a, "iniziale": 0, "comprati": 0, "spesa": 0, "consumati": 0,
+                         "differenze": 0, "contato": False} for a in articoli(solo_attivi=False)}
+    venduti = {}                                       # movimento_id -> (prodotto_id, qta, incasso)
+    consumi_per_mov = {}                               # movimento_id -> [(articolo_id, pezzi)]
+    for r in db().execute("""
+            SELECT g.*, m.prodotto_id, m.qta AS qta_mov, m.importo_cent AS importo_mov,
+                   COALESCE(m.annullato, 0) AS annullato
+            FROM magazzino g LEFT JOIN movimenti m ON m.id = g.movimento_id ORDER BY g.id""").fetchall():
+        x = per_art.get(r["articolo_id"])
+        if x is None or r["annullato"]:
+            continue
+        if r["tipo"] == "carico":
+            x["comprati"] += r["qta"]
+            x["spesa"] += r["costo_cent"]
+        elif r["tipo"] == "consumo":
+            x["consumati"] -= r["qta"]
+            if r["movimento_id"]:
+                venduti[r["movimento_id"]] = (r["prodotto_id"], r["qta_mov"], -r["importo_mov"])
+                consumi_per_mov.setdefault(r["movimento_id"], []).append((r["articolo_id"], -r["qta"]))
+        elif r["tipo"] == "inventario":
+            if x["contato"]:
+                x["differenze"] += r["qta"]
+            else:                                      # la prima conta è la quantità di partenza
+                x["iniziale"] += r["qta"]
+                x["contato"] = True
+    for x in per_art.values():
+        x["giacenza"] = x["iniziale"] + x["comprati"] - x["consumati"] + x["differenze"]
+        medio = x["spesa"] / x["comprati"] if x["comprati"] else None
+        x["costo_medio"] = None if medio is None else round(medio)
+        for voce in ("iniziale", "comprati", "consumati", "differenze", "giacenza"):
+            x[f"valore_{voce}"] = None if medio is None else round(x[voce] * medio)
+        x["valore_comprati"] = x["spesa"] if x["comprati"] else 0
+
+    def costo(articolo_id, pezzi):
+        medio = per_art[articolo_id]["spesa"] / per_art[articolo_id]["comprati"] \
+            if per_art.get(articolo_id) and per_art[articolo_id]["comprati"] else None
+        return None if medio is None else pezzi * medio
+
+    ricette = {}
+    for r in db().execute("SELECT * FROM ricette").fetchall():
+        ricette.setdefault(r["prodotto_id"], []).append((r["articolo_id"], r["qta"]))
+    per_prod = []
+    for pr in prodotti(solo_attivi=False):
+        movs = [mid for mid, v in venduti.items() if v[0] == pr["id"]]
+        if not movs and pr["id"] not in ricette:
+            continue
+        costi = [costo(a, n) for mid in movs for a, n in consumi_per_mov[mid]]
+        unitari = [costo(a, n) for a, n in ricette.get(pr["id"], [])]
+        per_prod.append({
+            "prodotto": pr,
+            "pezzi": sum(venduti[mid][1] for mid in movs),
+            "incasso": sum(venduti[mid][2] for mid in movs),
+            "costo": None if None in costi else round(sum(costi)),
+            "costo_unitario": None if None in unitari or not unitari else round(sum(unitari)),
+        })
+    for p in per_prod:
+        p["margine"] = None if p["costo"] is None else p["incasso"] - p["costo"]
+        p["margine_unitario"] = None if p["costo_unitario"] is None \
+            else p["prodotto"]["prezzo_cent"] - p["costo_unitario"]
+    elenco = [x for x in per_art.values() if x["contato"] or x["comprati"] or x["consumati"]]
+
+    def somma(chiave, righe):
+        valori = [r[chiave] for r in righe]
+        return None if None in valori else sum(valori)
+    totali = {k: somma(k, elenco) for k in ("valore_iniziale", "valore_comprati", "valore_consumati",
+                                             "valore_differenze", "valore_giacenza")}
+    totali.update({k: somma(k, per_prod) for k in ("incasso", "costo", "margine")})
+    return elenco, per_prod, totali
+
+
+@app.get("/admin/bilancio")
+@admin_richiesto
+def admin_bilancio():
+    elenco, per_prod, totali = bilancio_magazzino()
+    return render_template("bilancio.html", articoli=elenco, prodotti=per_prod, totali=totali)
+
+
 @app.post("/admin/acquisto-per")
 @admin_richiesto
 def admin_acquisto_per():

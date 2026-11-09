@@ -4,6 +4,7 @@
 <h1>📦 {{ _('Magazzino') }}</h1>
 <p class="aiuto">{{ _("La quantità scende da sola a ogni acquisto (secondo le ricette qui sotto) e sale quando approvi una spesa con la merce. Quando conti i pezzi veri, scrivili in «Pezzi contati»: la differenza resta nel registro.") }}</p>
 <p class="aiuto">{{ _("Quando un articolo arriva alla soglia, compare l'avviso di comprarlo agli amministratori e a chi è in debito.") }}</p>
+<a class="avviso-richieste vuoto" href="{{ url_for('admin_bilancio') }}">⚖️ {{ _('Bilancio: merce comprata, consumata e mancante, in euro') }} →</a>
 
 <section class="scheda">
   <h2>{{ _('Articoli') }}</h2>

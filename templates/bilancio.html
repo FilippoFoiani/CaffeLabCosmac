@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Bilancio del magazzino') }} – {{ nome_app }}{% endblock %}
+
+{# Importo o «—» se manca il costo (nessuna spesa con quell'articolo); con_segno per differenze e margini #}
+{% macro soldi(v, con_segno=false) -%}
+  {% if v is none %}<span class="aiuto" title="{{ _('Costo sconosciuto: nessuna spesa approvata con questo articolo') }}">—</span>{% else %}{{ v|euro(con_segno) }}{% endif %}
+{%- endmacro %}
+
+{% block contenuto %}
+<h1>⚖️ {{ _('Bilancio del magazzino') }}</h1>
+<p class="aiuto">🔒 {{ _('Visibile solo agli amministratori.') }} {{ _("Conta tutto dalla prima volta che ogni articolo è stato contato. Gli euro sono calcolati al costo medio di un pezzo, cioè quanto è costato in media nelle spese approvate.") }}</p>
+
+{% if not articoli %}
+<p class="aiuto">{{ _('Ancora niente da mostrare: conta la merce in «Magazzino» e registra le spese con pezzi e costo.') }}</p>
+{% else %}
+<div class="riassunto">
+  <div><span class="piccolo">{{ _('Merce comprata') }}</span><strong>{{ soldi(totali.valore_comprati) }}</strong></div>
+  <div><span class="piccolo">{{ _('Merce consumata') }}</span><strong>{{ soldi(totali.valore_consumati) }}</strong></div>
+  <div><span class="piccolo">{{ _('In magazzino') }}</span><strong>{{ soldi(totali.valore_giacenza) }}</strong></div>
+  <div><span class="piccolo">{{ _('Differenze delle conte') }}</span><strong class="{% if totali.valore_differenze and totali.valore_differenze < 0 %}neg{% endif %}">{{ soldi(totali.valore_differenze, true) }}</strong></div>
+</div>
+
+<h2>📦 {{ _('Articoli') }}</h2>
+{% for x in articoli %}
+<section class="scheda bilancio-articolo">
+  <strong>{{ x.articolo.emoji }} {{ _(x.articolo.nome) }}</strong>
+  <div class="piccolo">{% if x.costo_medio is none %}{{ _('costo sconosciuto') }}{% else %}{{ _('costo medio {costo} al pezzo', costo=x.costo_medio|euro(false)) }}{% endif %}</div>
+  <table class="tabella-bilancio">
+    <thead><tr><th></th><th scope="col">{{ _('pezzi') }}</th><th scope="col">€</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">{{ _('Iniziale (prima conta)') }}</th><td>{{ x.iniziale }}</td><td>{{ soldi(x.valore_iniziale) }}</td></tr>
+      <tr><th scope="row">+ {{ _('Comprati') }}</th><td>{{ x.comprati }}</td><td>{{ soldi(x.valore_comprati) }}</td></tr>
+      <tr><th scope="row">− {{ _("Consumati (segnati nell'app)") }}</th><td>{{ x.consumati }}</td><td>{{ soldi(x.valore_consumati) }}</td></tr>
+      <tr class="{% if x.differenze < 0 %}neg{% endif %}"><th scope="row">± {{ _('Differenze delle conte') }}</th><td>{{ '%+d'|format(x.differenze) }}</td><td>{{ soldi(x.valore_differenze, true) }}</td></tr>
+      <tr class="totale"><th scope="row">= {{ _('In magazzino') }}</th><td>{{ x.giacenza }}</td><td>{{ soldi(x.valore_giacenza) }}</td></tr>
+    </tbody>
+  </table>
+  {% if x.differenze < 0 %}<p class="piccolo neg">{{ _('Mancano {n} pezzi rispetto a quelli segnati: probabilmente consumi non registrati.', n=-x.differenze) }}</p>{% endif %}
+</section>
+{% endfor %}
+
+<h2>☕ {{ _('Prodotti: incassi e costi') }}</h2>
+<p class="aiuto">{{ _("Solo gli acquisti segnati da quando c'è il magazzino.") }} {{ _('Il costo di un pezzo viene dalla ricetta (es. caffè = cialda + bicchierino) al costo medio.') }}</p>
+{% for p in prodotti %}
+<section class="scheda bilancio-articolo">
+  <strong>{{ p.prodotto.emoji }} {{ _(p.prodotto.nome) }}</strong>
+  <div class="piccolo">{{ _('prezzo {prezzo}', prezzo=p.prodotto.prezzo_cent|euro(false)) }} · {{ _('costo') }} {{ soldi(p.costo_unitario) }}
+    · {{ _('margine') }} <strong class="{% if p.margine_unitario is not none and p.margine_unitario < 0 %}neg{% endif %}">{{ soldi(p.margine_unitario, true) }}</strong></div>
+  <table class="tabella-bilancio">
+    <tbody>
+      <tr><th scope="row">{{ _('Pezzi presi') }}</th><td>{{ p.pezzi }}</td></tr>
+      <tr><th scope="row">{{ _('Incassato') }}</th><td>{{ p.incasso|euro(false) }}</td></tr>
+      <tr><th scope="row">{{ _('Costo della merce') }}</th><td>{{ soldi(p.costo) }}</td></tr>
+      <tr class="totale {% if p.margine is not none and p.margine < 0 %}neg{% endif %}"><th scope="row">{{ _('Margine') }}</th><td>{{ soldi(p.margine, true) }}</td></tr>
+    </tbody>
+  </table>
+  {% if p.margine_unitario is not none and p.margine_unitario < 0 and p.prodotto.prezzo_cent > 0 %}<p class="piccolo neg">{{ _('Il prezzo non copre il costo della merce: valuta di aumentarlo.') }}</p>{% endif %}
+</section>
+{% endfor %}
+{% endif %}
+<p class="aiuto centro"><a href="{{ url_for('admin_magazzino') }}">← {{ _('Magazzino') }}</a> · <a href="{{ url_for('admin') }}">{{ _('Amministrazione') }}</a></p>
+{% endblock %}
