@@ -42,7 +42,21 @@ PRODOTTI_DEFAULT = [
     {"codice": "acqua", "nome": "Acqua", "emoji": "💧", "prezzo": 25, "conto": None},
     {"codice": "acqua_macchinetta", "nome": "Acqua macchinetta", "emoji": "🫗",
      "prezzo": 25, "conto": "Conto Caffè"},
+    {"codice": "bicchierino", "nome": "Bicchierino vuoto", "emoji": "🥤", "prezzo": 0, "conto": None},
 ]
+# Magazzino: la merce che si compra e si consuma (quantità e soglie si cambiano da Amministrazione)
+ARTICOLI_DEFAULT = [
+    {"codice": "cialde", "nome": "Cialde", "emoji": "🟤", "soglia": 20},
+    {"codice": "bottiglie", "nome": "Bottiglie", "emoji": "🍶", "soglia": 6},
+    {"codice": "bicchierini", "nome": "Bicchierini", "emoji": "🥛", "soglia": 20},
+]
+# Cosa scala dal magazzino ogni prodotto preso (prodotto -> {articolo: pezzi})
+RICETTE_DEFAULT = {
+    "caffe": {"cialde": 1, "bicchierini": 1},
+    "acqua": {"bottiglie": 1},
+    "acqua_macchinetta": {"bottiglie": 1},
+    "bicchierino": {"bicchierini": 1},
+}
 FINESTRA_ANNULLA = timedelta(minutes=10)   # entro quanto si può annullare da soli
 ATTESA_MAX_PAGAMENTO = timedelta(days=3)   # poi un pagamento non confermato lo può confermare un admin
 MAX_TENTATIVI_PIN = 5
@@ -171,6 +185,42 @@ CREATE TABLE IF NOT EXISTS registro_accessi (
     esito      TEXT    NOT NULL,            -- approvato | rifiutato | automatico
     deciso_da  INTEGER                      -- admin che ha deciso (vuoto = da console)
 );
+CREATE TABLE IF NOT EXISTS articoli (
+    id      INTEGER PRIMARY KEY,
+    codice  TEXT    UNIQUE,
+    nome    TEXT    NOT NULL,
+    emoji   TEXT    NOT NULL DEFAULT '',
+    soglia  INTEGER NOT NULL DEFAULT 0,          -- sotto (o uguale) compare l'avviso di comprarne
+    attivo  INTEGER NOT NULL DEFAULT 1,
+    ordine  INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS ricette (
+    prodotto_id INTEGER NOT NULL REFERENCES prodotti(id),
+    articolo_id INTEGER NOT NULL REFERENCES articoli(id),
+    qta         INTEGER NOT NULL,                 -- pezzi scalati per ogni prodotto preso
+    PRIMARY KEY (prodotto_id, articolo_id)
+);
+-- Registro del magazzino: la giacenza è la somma delle righe (come i saldi con i movimenti)
+CREATE TABLE IF NOT EXISTS magazzino (
+    id           INTEGER PRIMARY KEY,
+    ts           TEXT    NOT NULL,
+    articolo_id  INTEGER NOT NULL REFERENCES articoli(id),
+    qta          INTEGER NOT NULL,                -- con segno: + entra, - esce
+    tipo         TEXT    NOT NULL,                -- carico | consumo | inventario
+    costo_cent   INTEGER NOT NULL DEFAULT 0,      -- carico: quanto è costata questa quantità
+    movimento_id INTEGER REFERENCES movimenti(id),-- consumo: l'acquisto (se annullato non conta)
+    richiesta_id INTEGER REFERENCES richieste(id),-- carico: la spesa approvata
+    persona_id   INTEGER REFERENCES persone(id),  -- chi l'ha fatto
+    nota         TEXT    NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_magazzino_articolo ON magazzino(articolo_id);
+-- Articoli dichiarati in una spesa (diventano un carico quando la spesa è approvata)
+CREATE TABLE IF NOT EXISTS richieste_articoli (
+    richiesta_id INTEGER NOT NULL REFERENCES richieste(id),
+    articolo_id  INTEGER NOT NULL REFERENCES articoli(id),
+    qta          INTEGER NOT NULL,
+    costo_cent   INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS manutenzioni_fatte (
     id              INTEGER PRIMARY KEY,
     manutenzione_id INTEGER NOT NULL REFERENCES manutenzioni(id),
@@ -256,6 +306,15 @@ def inizializza_db():
             con.execute("INSERT INTO prodotti (codice, nome, emoji, prezzo_cent, addebito_id, ordine)"
                         " VALUES (?,?,?,?,?,?)", (pr["codice"], pr["nome"], pr["emoji"], prezzo,
                                                   addebito, i))
+        # Magazzino: articoli di partenza e cosa consuma ogni prodotto (una volta sola)
+        for i, ar in enumerate(ARTICOLI_DEFAULT):
+            con.execute("INSERT OR IGNORE INTO articoli (codice, nome, emoji, soglia, ordine) VALUES (?,?,?,?,?)",
+                        (ar["codice"], ar["nome"], ar["emoji"], ar["soglia"], i))
+        if con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('ricette_iniziali', '1')").rowcount:
+            for codice_pr, pezzi in RICETTE_DEFAULT.items():
+                for codice_ar, qta in pezzi.items():
+                    con.execute("INSERT OR IGNORE INTO ricette SELECT p.id, a.id, ? FROM prodotti p, articoli a "
+                                "WHERE p.codice=? AND a.codice=?", (qta, codice_pr, codice_ar))
         caffe = con.execute("SELECT id FROM prodotti WHERE codice='caffe'").fetchone()["id"]
         con.execute("UPDATE movimenti SET tipo='acquisto', prodotto_id=? WHERE tipo='caffe'", (caffe,))
     con.close()
@@ -281,8 +340,8 @@ def euro(cent, segno=True):
     return f"{'+' if cent > 0 else '−'}{s} €"
 
 
-def leggi_euro(testo, consenti_negativo=False):
-    """'5' / '5,50' / '5.5' / '-3,20' -> centesimi (int). None se non valido."""
+def leggi_euro(testo, consenti_negativo=False, consenti_zero=False):
+    """'5' / '5,50' / '5.5' / '-3,20' -> centesimi (int). None se non valido (anche 0, salvo consenti_zero)."""
     if testo is None:
         return None
     t = testo.strip().replace("€", "").replace(" ", "").replace(",", ".")
@@ -292,7 +351,7 @@ def leggi_euro(testo, consenti_negativo=False):
         valore = round(float(t) * 100)
     except ValueError:
         return None
-    if valore == 0 or abs(valore) > MAX_IMPORTO_CENT:
+    if (valore == 0 and not consenti_zero) or abs(valore) > MAX_IMPORTO_CENT:
         return None
     if valore < 0 and not consenti_negativo:
         return None
@@ -407,6 +466,46 @@ def conteggi_prodotti():
                           "WHERE tipo='acquisto' AND annullato=0 GROUP BY persona_id, prodotto_id"):
         out.setdefault(r["persona_id"], {})[r["prodotto_id"]] = r["n"]
     return out
+
+
+def articoli(solo_attivi=True):
+    """Articoli del magazzino con la giacenza (somma del registro, senza i consumi annullati)
+    e «contato»: se un admin ha già inserito almeno una volta la quantità vera."""
+    filtro = "WHERE a.attivo=1" if solo_attivi else ""
+    return db().execute(f"""
+        SELECT a.*,
+               COALESCE((SELECT SUM(g.qta) FROM magazzino g LEFT JOIN movimenti m ON m.id = g.movimento_id
+                         WHERE g.articolo_id = a.id AND COALESCE(m.annullato, 0) = 0), 0) AS giacenza,
+               EXISTS (SELECT 1 FROM magazzino g WHERE g.articolo_id = a.id AND g.tipo = 'inventario') AS contato
+        FROM articoli a {filtro} ORDER BY a.ordine, a.id""").fetchall()
+
+
+def articoli_da_comprare():
+    """Articoli già contati almeno una volta che sono arrivati alla soglia (o sotto)."""
+    return [a for a in articoli() if a["contato"] and a["giacenza"] <= a["soglia"]]
+
+
+def nome_articolo(a):
+    return _(a["nome"])
+
+
+def scala_magazzino(movimento_id, prodotto_id, qta, chi, con=None):
+    """Un acquisto consuma la merce della ricetta del prodotto. Se l'acquisto viene annullato,
+    le righe restano ma non contano più (la giacenza le esclude)."""
+    con = con or db()
+    for r in con.execute("SELECT articolo_id, qta FROM ricette WHERE prodotto_id=?", (prodotto_id,)).fetchall():
+        con.execute("INSERT INTO magazzino (ts, articolo_id, qta, tipo, movimento_id, persona_id) "
+                    "VALUES (?,?,?, 'consumo', ?, ?)", (adesso(), r["articolo_id"], -r["qta"] * qta,
+                                                        movimento_id, chi))
+
+
+def carica_magazzino(richiesta_id, chi, con=None):
+    """Spesa approvata: la merce dichiarata entra in magazzino, con il suo costo."""
+    con = con or db()
+    for r in con.execute("SELECT * FROM richieste_articoli WHERE richiesta_id=?", (richiesta_id,)).fetchall():
+        con.execute("INSERT INTO magazzino (ts, articolo_id, qta, tipo, costo_cent, richiesta_id, persona_id) "
+                    "VALUES (?,?,?, 'carico', ?, ?, ?)", (adesso(), r["articolo_id"], r["qta"],
+                                                          r["costo_cent"], richiesta_id, chi))
 
 
 def persona(pid):
@@ -761,8 +860,10 @@ def home():
         avviso = {"cassa": conto_cassa(), "creditori": creditori(db(), 3),
                   "importo": f"{-mio_saldo / 100:.2f}".replace(".", ","), "oltre_limite": oltre_limite}
     manutenzioni = [m for m in manutenzioni_con_stato() if m["da_fare"]] if u["admin"] else []
+    # merce sotto la soglia: lo vedono gli admin e chi è in debito (comprandola rientra)
+    da_comprare = articoli_da_comprare() if u["admin"] or mio_saldo < 0 else []
     return render_template("home.html", saldo=mio_saldo, ultimi=ultimi, nomi=nomi, avviso=avviso,
-                           manutenzioni=manutenzioni, limite=limite, limite_modo=modo,
+                           manutenzioni=manutenzioni, limite=limite, limite_modo=modo, da_comprare=da_comprare,
                            da_fare=conta_da_fare(u), mie_in_attesa=mie_richieste_in_attesa(u["id"]),
                            prodotti=prodotti(), conti={p["id"]: nome_completo(p)
                                                        for p in elenco_saldi()},
@@ -872,8 +973,9 @@ def acquista():
         for pr, q in scelte:
             chi = pr["addebito_id"] or u["id"]
             nota = f"presa da {nome_completo(u)}" if chi != u["id"] else ""
-            registra(chi, "acquisto", -q * pr["prezzo_cent"], qta=q, prodotto_id=pr["id"],
-                     gruppo=gruppo, nota=nota, creato_da=u["id"])
+            mid = registra(chi, "acquisto", -q * pr["prezzo_cent"], qta=q, prodotto_id=pr["id"],
+                           gruppo=gruppo, nota=nota, creato_da=u["id"])
+            scala_magazzino(mid, pr["id"], q, u["id"])
             if chi != u["id"]:
                 a_carico_di_altri.append(_("{cosa} a carico del {conto}", cosa=nome_prodotto(pr),
                                            conto=nome_completo(persona(chi))))
@@ -1043,35 +1145,84 @@ def scheda_persona(pid):
 @app.route("/spesa", methods=["GET", "POST"])
 @login_richiesto
 def spesa():
+    def pagina(form):
+        return render_template("spesa.html", form=form, articoli=articoli(), nonce=secrets.token_urlsafe(8),
+                               evidenzia=request.args.get("articolo", type=int))
     if request.method == "POST":
-        importo = leggi_euro(request.form.get("importo"))
-        nota = request.form.get("nota", "").strip()[:200]
-        if importo is None or not nota:
-            flash(_("Inserisci l'importo e cosa hai comprato."), "errore")
-            return render_template("spesa.html", form=request.form,
-                                   nonce=secrets.token_urlsafe(8))
+        righe, nota, importo, errore = leggi_spesa(request.form)
+        if errore:
+            flash(errore, "errore")
+            return pagina(request.form)
         if nonce_gia_usato(request.form.get("nonce")):
             return redirect(url_for("home"))
         if g.utente["admin"]:
             with db():
                 registra(g.utente["id"], "spesa", importo, nota=f"Spesa per il gruppo: {nota}",
                          creato_da=g.utente["id"])
-                db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, stato, "
-                             "deciso_da, deciso_ts) VALUES (?, 'spesa', ?, ?, ?, 'approvata', ?, ?)",
-                             (adesso(), g.utente["id"], importo, nota, g.utente["id"], adesso()))
+                rid = db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, stato, "
+                                   "deciso_da, deciso_ts) VALUES (?, 'spesa', ?, ?, ?, 'approvata', ?, ?)",
+                                   (adesso(), g.utente["id"], importo, nota, g.utente["id"], adesso())).lastrowid
+                salva_articoli_spesa(rid, righe)
+                carica_magazzino(rid, g.utente["id"])
             flash(_("Spesa registrata. Nuovo saldo: {saldo}", saldo=euro(saldo(g.utente['id']))), "ok")
             return redirect(url_for("home"))
         try:
             foto = salva_scontrino(request.files.get("foto"))
         except ValueError:
             flash(_("La foto non è un'immagine valida o è troppo grande."), "errore")
-            return render_template("spesa.html", form=request.form, nonce=secrets.token_urlsafe(8))
+            return pagina(request.form)
         with db():
-            db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, foto) "
-                         "VALUES (?, 'spesa', ?, ?, ?, ?)", (adesso(), g.utente["id"], importo, nota, foto))
+            rid = db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, foto) "
+                               "VALUES (?, 'spesa', ?, ?, ?, ?)",
+                               (adesso(), g.utente["id"], importo, nota, foto)).lastrowid
+            salva_articoli_spesa(rid, righe)
         flash(_("Spesa inviata: l'importo ti verrà accreditato quando un amministratore la approva."), "ok")
         return redirect(url_for("home"))
-    return render_template("spesa.html", form={}, nonce=secrets.token_urlsafe(8))
+    return pagina({})
+
+
+MAX_PEZZI_SPESA = 10000
+
+
+def leggi_spesa(form):
+    """Legge il modulo della spesa: per ogni articolo del magazzino pezzi e costo (obbligatori
+    entrambi), più «altro» (descrizione e costo). Restituisce (righe, nota, totale, errore)."""
+    righe = []
+    for a in articoli():
+        testo_qta = (form.get(f"qta_{a['id']}") or "").strip()
+        testo_costo = (form.get(f"costo_{a['id']}") or "").strip()
+        if not testo_qta and not testo_costo:
+            continue
+        qta = int(testo_qta) if testo_qta.isdigit() else 0
+        costo = leggi_euro(testo_costo)
+        if not 0 < qta <= MAX_PEZZI_SPESA:
+            return [], "", 0, _("Scrivi quanti pezzi di {nome} hai comprato.", nome=nome_articolo(a))
+        if costo is None:
+            return [], "", 0, _("Scrivi quanto hai speso per {nome} (es. 4,50).", nome=nome_articolo(a))
+        righe.append((a, qta, costo))
+    altro = (form.get("nota") or "").strip()[:200]
+    testo_importo = (form.get("importo") or "").strip()
+    costo_altro = leggi_euro(testo_importo) if testo_importo else 0
+    if costo_altro is None:
+        return [], "", 0, _("Importo non valido (es. 5 oppure 2,50).")
+    if costo_altro and not altro:
+        return [], "", 0, _("Scrivi cos'altro hai comprato.")
+    if altro and not costo_altro:
+        return [], "", 0, _("Scrivi quanto hai speso per il resto.")
+    totale = sum(costo for _a, _q, costo in righe) + costo_altro
+    if not totale:
+        return [], "", 0, _("Inserisci l'importo e cosa hai comprato.")
+    if totale > MAX_IMPORTO_CENT:
+        return [], "", 0, _("Importo non valido (es. 5 oppure 2,50).")
+    # descrizione in italiano (come le altre note): «50 cialde, 100 bicchierini, zucchero»
+    parti = [f"{qta} {a['nome'].lower()}" for a, qta, _c in righe] + ([altro] if altro else [])
+    return righe, ", ".join(parti)[:200], totale, None
+
+
+def salva_articoli_spesa(rid, righe):
+    for a, qta, costo in righe:
+        db().execute("INSERT INTO richieste_articoli (richiesta_id, articolo_id, qta, costo_cent) VALUES (?,?,?,?)",
+                     (rid, a["id"], qta, costo))
 
 
 # --------------------------------------------------------------------------
@@ -1216,6 +1367,7 @@ def decidi_richiesta(rid, azione):
             if r["tipo"] == "spesa":
                 registra(richiedente["id"], "spesa", r["importo_cent"],
                          nota=f"Spesa per il gruppo: {r['nota']}", creato_da=richiedente["id"])
+                carica_magazzino(rid, richiedente["id"])
             else:
                 registra_pagamento(richiedente, persona(r["controparte_id"]), r["importo_cent"], r["nota"])
     flash(_("Approvata: {cosa}", cosa=descrivi_richiesta(r)) if azione == "approva"
@@ -1907,7 +2059,7 @@ def admin_backup_invia():
 def _leggi_prodotto_da_form():
     nome = request.form.get("nome", "").strip()[:40]
     emoji = request.form.get("emoji", "").strip()[:4]
-    prezzo = leggi_euro(request.form.get("prezzo"))
+    prezzo = leggi_euro(request.form.get("prezzo"), consenti_zero=True)   # 0 = gratis (es. bicchierino vuoto)
     addebito = request.form.get("addebito_id", type=int) or None
     if addebito:
         conto = persona(addebito)
@@ -2024,6 +2176,96 @@ def admin_rettifica():
     return redirect(url_for("admin"))
 
 
+# --------------------------------------------------------------------------
+# Magazzino (solo admin): quantità, soglie, cosa consuma ogni prodotto
+# --------------------------------------------------------------------------
+@app.get("/admin/magazzino")
+@admin_richiesto
+def admin_magazzino():
+    elenco = articoli(solo_attivi=False)
+    ricette = {(r["prodotto_id"], r["articolo_id"]): r["qta"]
+               for r in db().execute("SELECT * FROM ricette").fetchall()}
+    registro = db().execute("""
+        SELECT g.*, a.nome AS articolo, a.emoji, COALESCE(m.annullato, 0) AS annullato
+        FROM magazzino g JOIN articoli a ON a.id = g.articolo_id
+        LEFT JOIN movimenti m ON m.id = g.movimento_id
+        ORDER BY g.id DESC LIMIT 60""").fetchall()
+    return render_template("magazzino.html", articoli=elenco, prodotti=prodotti(solo_attivi=False),
+                           ricette=ricette, registro=registro,
+                           nomi={p["id"]: nome_completo(p) for p in elenco_saldi(includi_inattivi=True)})
+
+
+def _leggi_articolo_da_form():
+    nome = request.form.get("nome", "").strip()[:40]
+    emoji = request.form.get("emoji", "").strip()[:4]
+    soglia = request.form.get("soglia", "").strip()
+    return nome, emoji, int(soglia) if soglia.isdigit() and int(soglia) <= MAX_PEZZI_SPESA else None
+
+
+@app.post("/admin/articolo/<int:aid>")
+@admin_richiesto
+def admin_articolo(aid):
+    a = next((x for x in articoli(solo_attivi=False) if x["id"] == aid), None) or abort(404)
+    nome, emoji, soglia = _leggi_articolo_da_form()
+    testo_contati = request.form.get("contati", "").strip()
+    contati = int(testo_contati) if testo_contati.isdigit() else None
+    if not nome or soglia is None:
+        flash(_("Servono un nome e una soglia (numero di pezzi, anche 0)."), "errore")
+        return redirect(url_for("admin_magazzino"))
+    if testo_contati and (contati is None or contati > MAX_PEZZI_SPESA):
+        flash(_("Scrivi quanti pezzi hai contato (un numero intero, anche 0)."), "errore")
+        return redirect(url_for("admin_magazzino"))
+    with db():
+        db().execute("UPDATE articoli SET nome=?, emoji=?, soglia=?, attivo=? WHERE id=?",
+                     (nome, emoji, soglia, 1 if request.form.get("attivo") else 0, aid))
+        if contati is not None:
+            # la conta vera sostituisce quella calcolata: la differenza resta nel registro
+            db().execute("INSERT INTO magazzino (ts, articolo_id, qta, tipo, persona_id, nota) "
+                         "VALUES (?,?,?, 'inventario', ?, ?)",
+                         (adesso(), aid, contati - a["giacenza"], g.utente["id"],
+                          f"contati {contati} (prima {a['giacenza']})"))
+    if contati is not None:
+        flash(_("{nome}: ora ne risultano {n}.", nome=nome, n=contati), "ok")
+    else:
+        flash(_("{nome} aggiornato.", nome=nome), "ok")
+    return redirect(url_for("admin_magazzino"))
+
+
+@app.post("/admin/articolo/nuovo")
+@admin_richiesto
+def admin_articolo_nuovo():
+    nome, emoji, soglia = _leggi_articolo_da_form()
+    if not nome or soglia is None:
+        flash(_("Servono un nome e una soglia (numero di pezzi, anche 0)."), "errore")
+        return redirect(url_for("admin_magazzino"))
+    ordine = (db().execute("SELECT MAX(ordine) AS m FROM articoli").fetchone()["m"] or 0) + 1
+    with db():
+        db().execute("INSERT INTO articoli (nome, emoji, soglia, ordine) VALUES (?,?,?,?)",
+                     (nome, emoji, soglia, ordine))
+    flash(_("Articolo aggiunto: {nome}. Inserisci quanti pezzi ci sono.", nome=nome), "ok")
+    return redirect(url_for("admin_magazzino"))
+
+
+@app.post("/admin/ricette")
+@admin_richiesto
+def admin_ricette():
+    """Quanti pezzi di ogni articolo scala ciascun prodotto (vale per gli acquisti da ora in poi)."""
+    nuove = []
+    for pr in prodotti(solo_attivi=False):
+        for a in articoli(solo_attivi=False):
+            testo = request.form.get(f"r_{pr['id']}_{a['id']}", "").strip()
+            if testo and (not testo.isdigit() or int(testo) > 20):
+                flash(_("Nelle ricette scrivi un numero di pezzi da 0 a 20."), "errore")
+                return redirect(url_for("admin_magazzino"))
+            if testo and int(testo):
+                nuove.append((pr["id"], a["id"], int(testo)))
+    with db():
+        db().execute("DELETE FROM ricette")
+        db().executemany("INSERT INTO ricette (prodotto_id, articolo_id, qta) VALUES (?,?,?)", nuove)
+    flash(_("Ricette salvate: valgono per gli acquisti da ora in poi."), "ok")
+    return redirect(url_for("admin_magazzino"))
+
+
 @app.post("/admin/acquisto-per")
 @admin_richiesto
 def admin_acquisto_per():
@@ -2035,8 +2277,9 @@ def admin_acquisto_per():
         flash(_("Scegli persona, prodotto e una quantità valida."), "errore")
     else:
         with db():
-            registra(p["id"], "acquisto", -qta * pr["prezzo_cent"], qta=qta, prodotto_id=pr["id"],
-                     creato_da=g.utente["id"])
+            mid = registra(p["id"], "acquisto", -qta * pr["prezzo_cent"], qta=qta, prodotto_id=pr["id"],
+                           creato_da=g.utente["id"])
+            scala_magazzino(mid, pr["id"], qta, p["id"])
         flash(_("Segnato {cosa} a {nome}.", cosa=etichetta_prodotto(pr, qta), nome=nome_completo(p)), "ok")
     return redirect(url_for("admin"))
 

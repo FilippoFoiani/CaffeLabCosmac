@@ -4,13 +4,35 @@
 <h1>{{ _('Ho comprato per il gruppo') }}</h1>
 <p class="aiuto">{{ _("Hai comprato caffè, cialde, zucchero o bicchierini per tutti? Registra la spesa: l'importo ti viene accreditato. La spesa è visibile a tutti nei movimenti.") }}</p>
 {% if not utente.admin %}<p class="aiuto">🔒 {{ _("Il credito arriva quando un amministratore approva la spesa: allega la foto dello scontrino per fare prima.") }}</p>{% endif %}
-<form method="post" action="{{ url_for('spesa') }}" class="modulo" enctype="multipart/form-data">
+<form method="post" action="{{ url_for('spesa') }}" class="modulo" enctype="multipart/form-data" id="modulo-spesa"
+      data-t-totale="{{ _('Totale: {totale}') }}">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <input type="hidden" name="nonce" value="{{ nonce }}">
-  <label for="nota">{{ _('Cosa hai comprato') }}</label>
-  <input id="nota" name="nota" maxlength="200" required placeholder="{{ _('es. 2 kg di caffè') }}" value="{{ form.get('nota', '') }}">
-  <label for="importo">{{ _('Quanto hai speso (€)') }}</label>
-  <input id="importo" name="importo" inputmode="decimal" required placeholder="{{ _('es. 18,90') }}" value="{{ form.get('importo', '') }}">
+
+  {% if articoli %}
+  <h2>📦 {{ _('Merce per il magazzino') }}</h2>
+  <p class="aiuto">{{ _("Per ogni cosa che hai comprato scrivi quanti pezzi e quanto li hai pagati in tutto: servono per sapere quanta merce c'è.") }}</p>
+  <div class="righe-spesa">
+    {% for a in articoli %}
+    <div class="riga-spesa">
+      <span class="nome-articolo">{{ a.emoji }} {{ _(a.nome) }}</span>
+      <input name="qta_{{ a.id }}" inputmode="numeric" pattern="[0-9]*" placeholder="{{ _('pezzi') }}"
+             aria-label="{{ _('Pezzi di {nome}', nome=_(a.nome)) }}" value="{{ form.get('qta_' ~ a.id, '') }}"
+             {% if evidenzia == a.id %}autofocus{% endif %}>
+      <input name="costo_{{ a.id }}" inputmode="decimal" placeholder="€" class="costo"
+             aria-label="{{ _('Costo di {nome} in euro', nome=_(a.nome)) }}" value="{{ form.get('costo_' ~ a.id, '') }}">
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <h2>🛒 {{ _('Altro') }}</h2>
+  <label for="nota">{{ _("Cos'altro hai comprato") }}</label>
+  <input id="nota" name="nota" maxlength="200" placeholder="{{ _('es. 2 kg di caffè') }}" value="{{ form.get('nota', '') }}">
+  <label for="importo">{{ _('Quanto hai speso per il resto (€)') }}</label>
+  <input id="importo" name="importo" inputmode="decimal" placeholder="{{ _('es. 18,90') }}" value="{{ form.get('importo', '') }}" class="costo">
+
+  <p class="anteprima" id="totale" hidden></p>
   {% if not utente.admin %}
   <label for="foto">{{ _('Foto dello scontrino (facoltativa)') }}</label>
   <input id="foto" name="foto" type="file" accept="image/*">
@@ -18,4 +40,24 @@
   <button type="submit" class="btn">{{ _('Registra la spesa') if utente.admin else _('Invia per approvazione') }}</button>
 </form>
 <p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
+{% endblock %}
+
+{% block script %}
+<script>
+  (function () {
+    var f = document.getElementById('modulo-spesa');
+    var out = document.getElementById('totale');
+    function aggiorna() {
+      var cent = 0;
+      f.querySelectorAll('input.costo').forEach(function (i) {
+        var v = Math.round(parseFloat((i.value || '').replace('€', '').replace(',', '.')) * 100);
+        if (v > 0) { cent += v; }
+      });
+      out.hidden = cent <= 0;
+      out.textContent = f.dataset.tTotale.replace('{totale}', (cent / 100).toFixed(2).replace('.', ',') + ' €');
+    }
+    f.addEventListener('input', aggiorna);
+    aggiorna();
+  })();
+</script>
 {% endblock %}

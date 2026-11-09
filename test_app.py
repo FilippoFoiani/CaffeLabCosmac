@@ -790,6 +790,95 @@ def test_statistiche_dei_consumi():
     assert app.test_client().get("/statistiche").status_code == 302
 
 
+def test_magazzino():
+    """Issue #3: giacenze che scendono con gli acquisti e salgono con le spese, avviso sotto soglia."""
+    def giacenze():
+        with app.app_context():
+            return {a["codice"]: a["giacenza"] for a in modulo.articoli(solo_attivi=False) if a["codice"]}
+
+    def porta_saldo(nome, cent):
+        with app.app_context():
+            modulo.registra(id_di(nome), "rettifica", cent - modulo.saldo(id_di(nome)), nota="Rettifica: test")
+            modulo.db().commit()
+
+    def compra(client, **pezzi):
+        tok, html = csrf(client, "/")
+        return client.post("/acquista", data={"_csrf": tok, "nonce": nonce(html),
+                                              **{f"q{prod(k)}": v for k, v in pezzi.items()}})
+
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin/magazzino")
+    with app.app_context():
+        ids = {a["codice"]: a["id"] for a in modulo.articoli() if a["codice"]}
+        # articoli e ricette di partenza; il bicchierino vuoto è gratis
+        assert set(ids) == {"cialde", "bottiglie", "bicchierini"}
+        assert modulo.db().execute("SELECT prezzo_cent FROM prodotti WHERE codice='bicchierino'").fetchone()[0] == 0
+    # finché non è contato, niente avviso anche se la giacenza è sotto la soglia
+    max_ = app.test_client()
+    entra(max_, "Max")
+    porta_saldo("Max", -500)
+    assert "Sta finendo la merce" not in max_.get("/").get_data(as_text=True)
+    # l'admin conta i pezzi veri
+    for codice, contati, soglia in (("cialde", 10, 5), ("bicchierini", 10, 5), ("bottiglie", 3, 2)):
+        admin.post(f"/admin/articolo/{ids[codice]}", data={"_csrf": toka, "nome": codice.capitalize(),
+                   "emoji": "x", "soglia": soglia, "contati": contati, "attivo": "1"})
+    assert giacenze() == {"cialde": 10, "bicchierini": 10, "bottiglie": 3}
+    # 2 caffè + 1 acqua macchinetta + 1 bicchierino vuoto: scala la merce, il bicchierino non costa
+    compra(max_, caffe=2, acqua_macchinetta=1, bicchierino=1)
+    assert giacenze() == {"cialde": 8, "bicchierini": 7, "bottiglie": 2}
+    with app.app_context():
+        prezzo_caffe = modulo.prodotto(prod("caffe"))["prezzo_cent"]
+    assert saldo_di("Max") == -500 - 2 * prezzo_caffe
+    # annullando l'acquisto la merce torna
+    with app.app_context():
+        mid = modulo.db().execute("SELECT id FROM movimenti WHERE creato_da=? ORDER BY id DESC",
+                                  (id_di("Max"),)).fetchone()[0]
+    tok, _ = csrf(max_, "/")
+    max_.post(f"/annulla/{mid}", data={"_csrf": tok})
+    assert giacenze() == {"cialde": 10, "bicchierini": 10, "bottiglie": 3}
+    # 1 acqua: bottiglie a 2 = soglia → avviso a chi è in debito e agli admin, non a chi è in credito
+    compra(max_, acqua=1)
+    assert giacenze()["bottiglie"] == 2
+    riccardo = app.test_client()
+    entra(riccardo, "Riccardo")
+    porta_saldo("Riccardo", 500)
+    assert "Sta finendo la merce" in max_.get("/").get_data(as_text=True)
+    assert "Sta finendo la merce" in admin.get("/").get_data(as_text=True)
+    assert "Sta finendo la merce" not in riccardo.get("/").get_data(as_text=True)
+    # spesa: pezzi senza costo o costo senza pezzi non passano
+    tok, html = csrf(max_, "/spesa")
+    r = max_.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"qta_{ids['bottiglie']}": "6"})
+    assert "Scrivi quanto hai speso per Bottiglie" in r.get_data(as_text=True)
+    r = max_.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"costo_{ids['bottiglie']}": "3"})
+    assert "Scrivi quanti pezzi di Bottiglie" in r.get_data(as_text=True)
+    # 6 bottiglie per 3 € + zucchero 1,50: la merce entra solo quando l'admin approva
+    saldo_prima = saldo_di("Max")
+    max_.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"qta_{ids['bottiglie']}": "6",
+                              f"costo_{ids['bottiglie']}": "3", "nota": "zucchero", "importo": "1,50"})
+    rid = richiesta_in_attesa("spesa")
+    with app.app_context():
+        r = modulo.db().execute("SELECT importo_cent, nota FROM richieste WHERE id=?", (rid,)).fetchone()
+        assert (r["importo_cent"], r["nota"]) == (450, "6 bottiglie, zucchero")
+    assert giacenze()["bottiglie"] == 2
+    admin.post(f"/richieste/{rid}/approva", data={"_csrf": toka})
+    assert giacenze()["bottiglie"] == 8 and saldo_di("Max") == saldo_prima + 450
+    assert "Sta finendo la merce" not in max_.get("/").get_data(as_text=True)
+    # la spesa di un admin entra subito; il registro e la pagina li vede solo l'admin
+    tok, html = csrf(admin, "/spesa")
+    admin.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"qta_{ids['cialde']}": "50",
+                               f"costo_{ids['cialde']}": "10"})
+    assert giacenze()["cialde"] == 60
+    pagina = admin.get("/admin/magazzino").get_data(as_text=True)
+    assert "Registro del magazzino" in pagina and "+50" in pagina
+    assert max_.get("/admin/magazzino").status_code == 403
+    # ricette modificabili: il caffè ora scala 2 cialde (e niente bicchierino)
+    admin.post("/admin/ricette", data={"_csrf": toka, f"r_{prod('caffe')}_{ids['cialde']}": "2"})
+    compra(max_, caffe=1)
+    assert giacenze()["cialde"] == 58 and giacenze()["bicchierini"] == 10
+    # prezzo 0 accettato per i prodotti; per gli importi normali 0 resta non valido
+    assert modulo.leggi_euro("0") is None and modulo.leggi_euro("0", consenti_zero=True) == 0
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

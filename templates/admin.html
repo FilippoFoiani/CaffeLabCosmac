@@ -7,6 +7,7 @@
   <a class="btn secondario" href="{{ url_for('qr') }}">🖨 QR code</a>
   <a class="btn secondario" href="{{ url_for('export_excel') }}">⬇︎ Excel</a>
   <a class="btn secondario" href="{{ url_for('admin_backup') }}">💾 Backup</a>
+  <a class="btn secondario" href="{{ url_for('admin_magazzino') }}">📦 {{ _('Magazzino') }}</a>
 </div>
 
 <a class="avviso-richieste{% if not n_da_approvare %} vuoto{% endif %}" href="{{ url_for('richieste') }}">📝 {{ _('Richieste da approvare: {n}', n=n_da_approvare) }} →</a>

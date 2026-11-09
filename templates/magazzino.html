@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _('Magazzino') }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>📦 {{ _('Magazzino') }}</h1>
+<p class="aiuto">{{ _("La quantità scende da sola a ogni acquisto (secondo le ricette qui sotto) e sale quando approvi una spesa con la merce. Quando conti i pezzi veri, scrivili in «Pezzi contati»: la differenza resta nel registro.") }}</p>
+<p class="aiuto">{{ _("Quando un articolo arriva alla soglia, compare l'avviso di comprarlo agli amministratori e a chi è in debito.") }}</p>
+
+<section class="scheda">
+  <h2>{{ _('Articoli') }}</h2>
+  {% for a in articoli %}
+  <form method="post" action="{{ url_for('admin_articolo', aid=a.id) }}" class="modulo prodotto-admin{% if not a.attivo %} spento{% endif %}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="riga-campi tra">
+      <strong>{{ a.emoji }} {{ _(a.nome) }}</strong>
+      <span>
+        {% if not a.contato %}<span class="etichetta">{{ _('da contare') }}</span>
+        {% elif a.giacenza <= a.soglia %}<span class="etichetta da-comprare">{{ _('da comprare') }}</span>{% endif %}
+        <strong class="{% if a.giacenza < 0 %}neg{% endif %}">{{ _('{n} pezzi', n=a.giacenza) }}</strong>
+      </span>
+    </div>
+    <div class="riga-campi">
+      <input name="emoji" value="{{ a.emoji }}" class="campo-emoji" aria-label="Emoji">
+      <input name="nome" value="{{ a.nome }}" required aria-label="{{ _('Nome articolo') }}">
+    </div>
+    <div class="riga-campi">
+      <label class="piccolo" for="soglia-{{ a.id }}">{{ _('Soglia') }}</label>
+      <input id="soglia-{{ a.id }}" name="soglia" inputmode="numeric" value="{{ a.soglia }}" class="campo-prezzo" required>
+      <label class="piccolo" for="contati-{{ a.id }}">{{ _('Pezzi contati') }}</label>
+      <input id="contati-{{ a.id }}" name="contati" inputmode="numeric" placeholder="—">
+    </div>
+    <div class="riga-campi tra">
+      <label class="spunta"><input type="checkbox" name="attivo" value="1" {% if a.attivo %}checked{% endif %}> {{ _('Attivo') }}</label>
+      <button type="submit" class="btn">{{ _('Salva') }}</button>
+    </div>
+  </form>
+  {% endfor %}
+  <details>
+    <summary>{{ _('Aggiungi un articolo') }}</summary>
+    <form method="post" action="{{ url_for('admin_articolo_nuovo') }}" class="modulo prodotto-admin">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <div class="riga-campi">
+        <input name="emoji" placeholder="🥄" class="campo-emoji" aria-label="Emoji">
+        <input name="nome" placeholder="{{ _('Nome') }}" required aria-label="{{ _('Nome articolo') }}">
+        <input name="soglia" inputmode="numeric" placeholder="{{ _('Soglia') }}" class="campo-prezzo" required aria-label="{{ _('Soglia') }}">
+      </div>
+      <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
+    </form>
+  </details>
+</section>
+
+<section class="scheda">
+  <h2>🧮 {{ _('Cosa consuma ogni prodotto') }}</h2>
+  <p class="aiuto">{{ _('Pezzi scalati dal magazzino per ogni prodotto preso. Vale per gli acquisti da ora in poi.') }}</p>
+  <form method="post" action="{{ url_for('admin_ricette') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="tabella-scorre">
+      <table class="tabella-ricette">
+        <thead><tr><th></th>{% for a in articoli %}<th scope="col">{{ a.emoji }} {{ _(a.nome) }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for pr in prodotti %}
+          <tr{% if not pr.attivo %} class="spento"{% endif %}>
+            <th scope="row">{{ pr.emoji }} {{ _(pr.nome) }}</th>
+            {% for a in articoli %}
+            <td><input name="r_{{ pr.id }}_{{ a.id }}" inputmode="numeric" value="{{ ricette.get((pr.id, a.id), '') }}" placeholder="0"
+                       aria-label="{{ _('{articolo} per {prodotto}', articolo=_(a.nome), prodotto=_(pr.nome)) }}"></td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="submit" class="btn">{{ _('Salva le ricette') }}</button>
+  </form>
+</section>
+
+<section class="scheda">
+  <h2>🗂 {{ _('Registro del magazzino') }}</h2>
+  {% if not registro %}<p class="aiuto">{{ _('Ancora nessun movimento di magazzino.') }}</p>{% else %}
+  <ul class="lista">
+    {% for r in registro %}
+    <li class="{% if r.annullato %}annullato{% endif %}">
+      <div>
+        <div>{{ r.emoji }} {{ _(r.articolo) }} · {% if r.tipo == 'carico' %}{{ _('spesa') }}{% elif r.tipo == 'consumo' %}{{ _('consumo') }}{% else %}{{ _('conta') }}{% endif %}{% if r.costo_cent %} · {{ r.costo_cent|euro(false) }}{% endif %}</div>
+        <div class="piccolo">{{ r.ts|ora }}{% if r.persona_id %} · {{ nomi.get(r.persona_id, '?') }}{% endif %}{% if r.annullato %} · {{ _('acquisto annullato') }}{% endif %}</div>
+      </div>
+      <div class="importo {% if r.qta < 0 %}neg{% elif r.qta > 0 %}pos{% endif %}">{{ '%+d'|format(r.qta) }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+<p class="aiuto centro"><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
+{% endblock %}

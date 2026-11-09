@@ -296,3 +296,19 @@ input[type=file] { padding: 10px; }
 .stat-barra .seg { display: block; min-width: 3px; }
 .stat-barra .seg:last-child { border-radius: 0 4px 4px 0; }
 .stat-numeri { grid-column: 2; }
+
+/* Magazzino: spesa con pezzi e costo, avviso merce in esaurimento, ricette */
+.righe-spesa { display: flex; flex-direction: column; gap: 8px; }
+.riga-spesa { display: grid; grid-template-columns: 1fr 5.5em 5.5em; gap: 8px; align-items: center; }
+.riga-spesa input { min-width: 0; }
+.nome-articolo { font-weight: 600; }
+.elenco-da-comprare { margin: 6px 0; padding-left: 20px; }
+.elenco-da-comprare a { color: inherit; font-weight: 700; }
+.avviso-magazzino .btn { margin-top: 6px; }
+.etichetta.da-comprare { background: #b7791f; color: #fff; }
+.tabella-scorre { overflow-x: auto; }
+.tabella-ricette { border-collapse: collapse; width: 100%; font-size: 14px; }
+.tabella-ricette th, .tabella-ricette td { padding: 4px; text-align: center; }
+.tabella-ricette th[scope=row] { text-align: left; white-space: nowrap; }
+.tabella-ricette input { width: 3.2em; text-align: center; }
+.tabella-ricette tr.spento { opacity: .6; }

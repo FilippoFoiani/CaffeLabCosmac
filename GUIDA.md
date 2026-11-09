@@ -9,6 +9,7 @@ Prodotti di partenza (prezzi e nomi si cambiano da *Amministrazione*):
 | ☕ Caffè | 0,30 € | chi lo prende |
 | 💧 Acqua | 0,25 € | chi la prende |
 | 🫗 Acqua macchinetta | 0,25 € | il **Conto Caffè** (conto comune creato in automatico) |
+| 🥤 Bicchierino vuoto | gratis | nessuno (serve solo a contare i bicchierini) |
 
 ## Cosa c'è nella cartella
 
@@ -113,7 +114,7 @@ Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSG
 - **Pagamenti tra persone**:
   - *Ho dato dei soldi a qualcuno*: se dai 5 € a chi è in credito, il tuo saldo sale di 5 € e il suo scende di 5 €. **Conta solo quando chi ha ricevuto i soldi conferma** dalla pagina *Richieste* (per la Cassa conferma un amministratore). Vale anche quando paga un amministratore: nessuno può confermare un proprio pagamento.
   - *Mi prendo il debito di qualcuno*: ti accolli una parte del debito di un altro (come Massi con Martin sul foglio). Vale subito, perché pesa solo su di te.
-- **Ho comprato per il gruppo**: chi compra caffè o cialde registra la spesa, anche con la foto dello scontrino. **Il credito arriva quando un amministratore la approva.**
+- **Ho comprato per il gruppo**: chi compra caffè o cialde registra la spesa, anche con la foto dello scontrino. **Il credito arriva quando un amministratore la approva.** Per la merce del magazzino (cialde, bottiglie, bicchierini) bisogna scrivere **quanti pezzi** e quanto sono costati; tutto il resto va in *Altro* con descrizione e costo. Il totale lo calcola l'app.
 - **Richieste**: qui ognuno conferma i pagamenti ricevuti e vede le proprie richieste in attesa (che può annullare). Gli amministratori vedono anche spese e nuovi accessi da approvare, e i pagamenti tra persone fermi da più di 3 giorni, che possono confermare al posto di chi doveva riceverli (tranne i propri); in cima alla pagina principale compare un avviso quando c'è qualcosa da fare.
 - **Come funziona**: pagina con le regole, come rientrare dal debito e le linee guida per la pulizia. Si apre anche senza aver fatto l'accesso: puoi mandarne il link a chi deve iniziare.
 - **Saldi di tutti**: visibili a tutti, con il pulsante per scaricare l'**Excel** (fogli *Saldi* e *Movimenti*).
@@ -134,6 +135,7 @@ Per l'amministratore:
 - **Nuovi accessi**: il primo accesso di ogni persona (e ogni nuova registrazione) resta in attesa finché un amministratore non lo approva da *Richieste*. Se qualcuno attiva l'account di un altro, rifiutalo: l'account torna libero per il vero proprietario. Chi era già entrato prima di questo aggiornamento resta attivo.
 - **Registro approvazioni** (*Amministrazione → Registro approvazioni*, solo admin): per ogni accesso, spesa e pagamento approvato, rifiutato o annullato mostra chi l'ha chiesto, chi ha deciso e quando, con lo scontrino se c'è. Lo storico completo è anche nel foglio *Approvazioni* dell'Excel, che compare solo quando lo scarica un admin. Le spese di un admin e i suoi versamenti ai conti comuni (che valgono subito) compaiono come "registrata direttamente dall'admin". Gli accessi approvati prima di questo aggiornamento non sono nel registro.
 - **Limite di debito**: in *Amministrazione* scegli l'importo (0 = nessun limite) e cosa succede oltre il limite: *avvisa e chiedi conferma* (consigliato) oppure *blocca gli acquisti*. Chi è oltre il limite vede un avviso rosso fisso.
+- **Magazzino** (*Amministrazione → Magazzino*): per ogni articolo (cialde, bottiglie, bicchierini, e altri che puoi aggiungere) la quantità scende da sola a ogni acquisto e sale quando approvi una spesa con la merce. Ogni caffè scala 1 cialda e 1 bicchierino, ogni acqua (anche quella per la macchinetta) 1 bottiglia, ogni bicchierino vuoto 1 bicchierino: si cambia nella tabella *Cosa consuma ogni prodotto*. Quando conti i pezzi veri scrivili in *Pezzi contati*: la differenza resta nel registro. Quando un articolo arriva alla **soglia**, gli amministratori e chi è in debito vedono in home il riquadro «Sta finendo la merce» con il pulsante per registrare l'acquisto. Finché un articolo non è stato contato almeno una volta l'avviso non compare.
 - **Manutenzione della macchinetta**: in *Amministrazione* ci sono i promemoria (all'inizio due esempi, *Pulizia della macchinetta* ogni 7 giorni e *Decalcificazione* ogni 30: cambiali, eliminali o aggiungine altri). Si imposta ogni quanti giorni e quando è stata fatta l'ultima volta. Quando scade, **solo gli amministratori** vedono un riquadro giallo in cima alla pagina principale; chi la fa tocca **Fatta** e il conteggio riparte. Resta lo storico di chi l'ha fatta e quando.
 - **Backup settimanale**: ogni lunedì dalle 8:00 gli amministratori che hanno l'email nel *Profilo* ricevono un'email con due allegati: l'**Excel** (saldi, movimenti, approvazioni) e il **database completo** (`caffe_backup_AAAA-MM-GG.db`), che serve per il ripristino. Il primo parte subito dopo l'aggiornamento che lo introduce. In *Amministrazione → Backup settimanale* vedi chi lo riceve, l'esito dell'ultimo invio e il pulsante **Invia il backup adesso**. Serve che le email siano configurate (passo 4). L'email contiene i dati del gruppo e i PIN cifrati: non inoltrarla.
 - Inoltre si possono cambiare prezzi e nomi dei prodotti, aggiungerne di nuovi o disattivarli, scegliere se un prodotto lo paga chi lo prende o un conto comune, segnare acquisti per conto di qualcuno, fare rettifiche e versamenti, aggiungere persone e scaricare il backup.
@@ -148,6 +150,7 @@ Per l'amministratore:
   3. **Consoles → Bash**: `unzip -o caffe-lab.zip` (sovrascrive solo il codice; se lo zip contiene anche `requirements.txt` nuovo, poi `pip3.12 install --user -r caffe-lab/requirements.txt`);
   4. scheda **Web** → **Reload**.
   Al riavvio l'app aggiunge da sola le tabelle e le colonne nuove al database. **Non** rilanciare `gestione.py importa`. Il file WSGI non viene toccato.
+  Dopo l'aggiornamento che introduce il magazzino: vai in *Amministrazione → Magazzino*, conta cialde, bottiglie e bicchierini e scrivi le quantità in *Pezzi contati*, poi controlla le soglie.
   Se avevi già installato una versione precedente, i saldi del nuovo file aggiungili da *Amministrazione → Rettifica*, oppure ricomincia da zero: cancella la cartella `dati/` **solo se** nell'app non c'è ancora niente di importante, poi rifai l'import.
 - Se qualcosa non va: nella scheda Web c'è il link all'**error log**.
 

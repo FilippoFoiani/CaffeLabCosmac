@@ -13,6 +13,19 @@
 <a class="info-attesa" href="{{ url_for('richieste') }}">⏳ {{ _('{n} tue richieste in attesa di conferma', n=mie_in_attesa|length) if mie_in_attesa|length > 1 else _('1 tua richiesta in attesa di conferma') }}</a>
 {% endif %}
 
+{% if da_comprare %}
+<section class="avviso-manutenzione avviso-magazzino" role="alert">
+  <div class="avviso-titolo">📦 {{ _('Sta finendo la merce') }}</div>
+  <ul class="elenco-da-comprare">
+    {% for a in da_comprare %}
+    <li><a href="{{ url_for('spesa', articolo=a.id) }}">{{ a.emoji }} {{ _(a.nome) }}</a> · {{ _('ne restano {n}', n=[a.giacenza, 0]|max) }}</li>
+    {% endfor %}
+  </ul>
+  <p class="piccolo">{{ _("Se la compri tu, registrala in «Ho comprato per il gruppo» con pezzi e costo: l'importo ti viene accreditato.") }}</p>
+  <a class="btn" href="{{ url_for('spesa', articolo=da_comprare[0].id) }}">🛒 {{ _('La compro io') }}</a>
+</section>
+{% endif %}
+
 {% if manutenzioni %}
 <section class="avviso-manutenzione" role="alert">
   <div class="avviso-titolo">🔧 {{ _('Manutenzione della macchinetta da fare') }}</div>
