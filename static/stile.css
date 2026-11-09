@@ -321,3 +321,21 @@ input[type=file] { padding: 10px; }
 .tabella-bilancio th[scope=row] { text-align: left; font-weight: 400; }
 .tabella-bilancio td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tabella-bilancio tr.totale th, .tabella-bilancio tr.totale td { font-weight: 700; border-top: 2px solid var(--bordo); }
+
+/* Notifiche in home: novità dell'aggiornamento e comunicazioni degli admin, con la spunta «Ho letto» */
+.notifica { border-radius: var(--raggio); padding: 12px 14px; margin: 6px 0 14px; border: 2px solid; }
+.notifica-novita { background: #eef5ff; border-color: #2a78d6; color: #12345a; }
+.notifica-comunicazione { background: #f3efff; border-color: #6250d6; color: #2b2160; }
+@media (prefers-color-scheme: dark) {
+  .notifica-novita { background: #13263d; border-color: #3987e5; color: #d6e7ff; }
+  .notifica-comunicazione { background: #221d3d; border-color: #9085e9; color: #e4dfff; }
+}
+.notifica a { color: inherit; }
+.elenco-novita { margin: 6px 0 8px; padding-left: 20px; font-size: 15px; line-height: 1.35; }
+.elenco-novita li { margin: 4px 0; }
+.testo-comunicazione { white-space: pre-line; overflow-wrap: anywhere; margin: 6px 0; }
+.ho-letto { font-weight: 700 !important; cursor: pointer; }
+.ho-letto input { width: 22px; height: 22px; }
+.notifica form { margin: 0; }
+textarea { width: 100%; font: inherit; padding: 12px; border: 1px solid var(--bordo); border-radius: 12px;
+  background: var(--card); color: var(--testo); resize: vertical; }

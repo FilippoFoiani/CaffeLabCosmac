@@ -66,11 +66,3 @@
 <p class="aiuto">{{ _("Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. Come nel saldo, l'acqua per la macchinetta conta sulla Macchinetta del caffè, non su chi l'ha presa.") }}</p>
 <p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}
-
-{% block script %}
-<script>
-  document.querySelectorAll('[data-invia-subito]').forEach(function (s) {
-    s.addEventListener('change', function () { s.form.submit(); });
-  });
-</script>
-{% endblock %}

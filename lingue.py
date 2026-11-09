@@ -380,6 +380,25 @@ EN = {
     "Articolo aggiunto: {nome}. Inserisci quanti pezzi ci sono.": "Item added: {nome}. Enter how many pieces there are.",
     "Nelle ricette scrivi un numero di pezzi da 0 a 20.": "In the recipes, enter a number of pieces from 0 to 20.",
     "Ricette salvate: valgono per gli acquisti da ora in poi.": "Recipes saved: they apply to purchases from now on.",
+    # --- novità e comunicazioni ---
+    "Novità dell'aggiornamento": "What's new in this update",
+    "Ho letto": "I've read it",
+    "Comunicazione": "Announcement",
+    "Comunicazioni a tutti": "Announcements to everyone",
+    "Compare in home a tutti come notifica, finché ognuno non spunta «Ho letto». Puoi ritirarla quando non serve più.":
+        "It appears on everyone's home page as a notification until each person ticks “I've read it”. You can withdraw it when it's no longer needed.",
+    "Testo": "Text",
+    "es. Domani la macchinetta è in manutenzione: niente caffè fino alle 11.":
+        "e.g. Tomorrow the machine is being serviced: no coffee until 11.",
+    "Pubblica": "Publish",
+    "letta da {n} su {tot}": "read by {n} of {tot}",
+    "ritirata": "withdrawn",
+    "Ritira": "Withdraw",
+    "Ritirare questa comunicazione? Non comparirà più a nessuno.": "Withdraw this announcement? Nobody will see it any more.",
+    "Scrivi il testo della comunicazione (al massimo {n} caratteri).": "Write the announcement text (at most {n} characters).",
+    "Comunicazione pubblicata: la vedono tutti in home finché non spuntano «Ho letto».":
+        "Announcement published: everyone sees it on the home page until they tick “I've read it”.",
+    "Comunicazione ritirata: non compare più a nessuno.": "Announcement withdrawn: nobody sees it any more.",
     # --- bilancio del magazzino ---
     "Bilancio": "Balance sheet",
     "Bilancio del magazzino": "Stock balance sheet",

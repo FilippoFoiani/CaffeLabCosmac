@@ -6,6 +6,38 @@
   <div class="sotto">{% if saldo < 0 %}{{ _('il tuo debito') }} · <a href="{{ url_for('come_funziona') }}#debito">{{ _('come rientrare') }} →</a>{% elif saldo > 0 %}{{ _('il tuo credito') }}{% else %}{{ _('sei in pari') }}{% endif %}</div>
 </section>
 
+{% for c in comunicazioni %}
+<section class="notifica notifica-comunicazione" role="status">
+  <div class="avviso-titolo">📣 {{ _('Comunicazione') }}{% if c.nome %} · {{ c|nome }}{% endif %}</div>
+  <p class="testo-comunicazione">{{ c.testo }}</p>
+  <div class="riga-campi tra">
+    <span class="piccolo">{{ c.ts|ora }}</span>
+    <form method="post" action="{{ url_for('comunicazione_letta', cid=c.id) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label class="spunta ho-letto"><input type="checkbox" name="letto" value="1" data-invia-subito> {{ _('Ho letto') }}</label>
+      <noscript><button type="submit" class="btn piccolo-btn">{{ _('Ho letto') }}</button></noscript>
+    </form>
+  </div>
+</section>
+{% endfor %}
+
+{% if novita %}
+<section class="notifica notifica-novita" role="status">
+  <div class="avviso-titolo">✨ {{ _("Novità dell'aggiornamento") }}</div>
+  {% for n in novita %}
+  <ul class="elenco-novita">
+    {% for punto in n.punti %}<li>{{ punto }}</li>{% endfor %}
+  </ul>
+  {% endfor %}
+  <form method="post" action="{{ url_for('novita_lette') }}" class="riga-campi tra">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <a class="piccolo" href="{{ url_for('come_funziona') }}">{{ _('Come funziona') }} →</a>
+    <label class="spunta ho-letto"><input type="checkbox" name="letto" value="1" data-invia-subito> {{ _('Ho letto') }}</label>
+    <noscript><button type="submit" class="btn piccolo-btn">{{ _('Ho letto') }}</button></noscript>
+  </form>
+</section>
+{% endif %}
+
 {% if da_fare %}
 <a class="avviso-richieste" href="{{ url_for('richieste') }}">📝 {{ _('Hai {n} richieste da confermare', n=da_fare) if da_fare > 1 else _('Hai 1 richiesta da confermare') }} →</a>
 {% endif %}

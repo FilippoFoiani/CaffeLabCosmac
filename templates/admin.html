@@ -14,6 +14,37 @@
 <a class="avviso-richieste{% if not n_da_approvare %} vuoto{% endif %}" href="{{ url_for('richieste') }}">📝 {{ _('Richieste da approvare: {n}', n=n_da_approvare) }} →</a>
 <a class="avviso-richieste vuoto" href="{{ url_for('admin_registro') }}">🗂 {{ _('Registro approvazioni: chi ha approvato cosa') }} →</a>
 
+<section class="scheda" id="comunicazioni">
+  <h2>📣 {{ _('Comunicazioni a tutti') }}</h2>
+  <p class="aiuto">{{ _("Compare in home a tutti come notifica, finché ognuno non spunta «Ho letto». Puoi ritirarla quando non serve più.") }}</p>
+  <form method="post" action="{{ url_for('admin_comunicazione_nuova') }}" class="modulo">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label for="testo-comunicazione">{{ _('Testo') }}</label>
+    <textarea id="testo-comunicazione" name="testo" rows="3" maxlength="{{ max_testo }}" required
+              placeholder="{{ _('es. Domani la macchinetta è in manutenzione: niente caffè fino alle 11.') }}"></textarea>
+    <button type="submit" class="btn">{{ _('Pubblica') }}</button>
+  </form>
+  {% if comunicazioni %}
+  <ul class="lista">
+    {% for c in comunicazioni %}
+    <li class="richiesta{% if not c.attiva %} spento{% endif %}">
+      <div>
+        <div class="testo-comunicazione">{{ c.testo }}</div>
+        <div class="piccolo">{{ c.ts|ora }}{% if c.nome %} · {{ c|nome }}{% endif %} ·
+          {% if c.attiva %}{{ _('letta da {n} su {tot}', n=c.lette, tot=n_con_accesso) }}{% else %}{{ _('ritirata') }}{% endif %}</div>
+      </div>
+      {% if c.attiva %}
+      <form method="post" action="{{ url_for('admin_comunicazione_ritira', cid=c.id) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button type="submit" class="btn secondario piccolo-btn" data-conferma="{{ _('Ritirare questa comunicazione? Non comparirà più a nessuno.') }}">{{ _('Ritira') }}</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
 <section class="scheda" id="limite">
   <h2>🚫 {{ _('Limite di debito') }}</h2>
   <p class="aiuto">{{ _('Chi supera il limite vede un avviso fisso in cima alla pagina. Puoi scegliere se gli acquisti oltre il limite vengono bloccati o se basta una conferma. 0 = nessun limite.') }}</p>

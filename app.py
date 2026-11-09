@@ -23,6 +23,7 @@ from flask import (Flask, abort, flash, g, has_app_context, redirect, render_tem
                    request, send_file, session, url_for)
 
 from lingue import LINGUE, traduci
+from novita import NOVITA
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -221,6 +222,20 @@ CREATE TABLE IF NOT EXISTS richieste_articoli (
     qta          INTEGER NOT NULL,
     costo_cent   INTEGER NOT NULL
 );
+-- Comunicazioni interne scritte da un admin: compaiono in home finché ognuno non spunta «Ho letto»
+CREATE TABLE IF NOT EXISTS comunicazioni (
+    id        INTEGER PRIMARY KEY,
+    ts        TEXT    NOT NULL,
+    autore_id INTEGER REFERENCES persone(id),
+    testo     TEXT    NOT NULL,
+    attiva    INTEGER NOT NULL DEFAULT 1           -- 0 = ritirata dall'admin: non compare più
+);
+CREATE TABLE IF NOT EXISTS comunicazioni_lette (
+    comunicazione_id INTEGER NOT NULL REFERENCES comunicazioni(id),
+    persona_id       INTEGER NOT NULL REFERENCES persone(id),
+    ts               TEXT    NOT NULL,
+    PRIMARY KEY (comunicazione_id, persona_id)
+);
 CREATE TABLE IF NOT EXISTS manutenzioni_fatte (
     id              INTEGER PRIMARY KEY,
     manutenzione_id INTEGER NOT NULL REFERENCES manutenzioni(id),
@@ -272,7 +287,9 @@ def inizializza_db():
                           ("nuovo_account", "INTEGER NOT NULL DEFAULT 0"),
                           # come vuole essere pagato (facoltativi, visibili nella sua scheda)
                           ("paypal", "TEXT NOT NULL DEFAULT ''"),
-                          ("iban", "TEXT NOT NULL DEFAULT ''")):
+                          ("iban", "TEXT NOT NULL DEFAULT ''"),
+                          # ultima voce di novita.py che ha spuntato «Ho letto»
+                          ("novita_lette", "TEXT NOT NULL DEFAULT ''")):
             if col not in colonne_p:
                 con.execute(f"ALTER TABLE persone ADD COLUMN {col} {tipo}")
         # Le prime email partiranno dal prossimo lunedì, non appena si installa l'app
@@ -847,6 +864,43 @@ def esci():
 # --------------------------------------------------------------------------
 # Pagina principale: segna caffè
 # --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# Novità degli aggiornamenti e comunicazioni interne (notifiche in home con «Ho letto»)
+# --------------------------------------------------------------------------
+def novita_da_leggere(u):
+    """Voci di novita.py non ancora spuntate, nella lingua di chi legge. Chi ha creato
+    l'account dopo un aggiornamento non vede quelle voci: per lui non sono novità."""
+    lingua = lingua_corrente()
+    return [{"id": n["id"], "punti": n.get(lingua) or n["it"]} for n in NOVITA
+            if n["id"] > (u["novita_lette"] or "") and n["id"] >= (u["creato"] or "")[:10]]
+
+
+def comunicazioni_da_leggere(uid):
+    return db().execute("""
+        SELECT c.*, p.nome, p.cognome FROM comunicazioni c LEFT JOIN persone p ON p.id = c.autore_id
+        WHERE c.attiva = 1 AND NOT EXISTS (SELECT 1 FROM comunicazioni_lette l
+                                           WHERE l.comunicazione_id = c.id AND l.persona_id = ?)
+        ORDER BY c.id DESC""", (uid,)).fetchall()
+
+
+@app.post("/novita/lette")
+@login_richiesto
+def novita_lette():
+    if NOVITA:
+        with db():
+            db().execute("UPDATE persone SET novita_lette=? WHERE id=?", (NOVITA[0]["id"], g.utente["id"]))
+    return redirect(url_for("home"))
+
+
+@app.post("/comunicazione/<int:cid>/letta")
+@login_richiesto
+def comunicazione_letta(cid):
+    if db().execute("SELECT 1 FROM comunicazioni WHERE id=?", (cid,)).fetchone():
+        with db():
+            db().execute("INSERT OR IGNORE INTO comunicazioni_lette VALUES (?,?,?)", (cid, g.utente["id"], adesso()))
+    return redirect(url_for("home"))
+
+
 @app.get("/")
 @login_richiesto
 def home():
@@ -868,6 +922,7 @@ def home():
     da_comprare = articoli_da_comprare() if u["admin"] or mio_saldo < 0 else []
     return render_template("home.html", saldo=mio_saldo, ultimi=ultimi, nomi=nomi, avviso=avviso,
                            manutenzioni=manutenzioni, limite=limite, limite_modo=modo, da_comprare=da_comprare,
+                           novita=novita_da_leggere(u), comunicazioni=comunicazioni_da_leggere(u["id"]),
                            da_fare=conta_da_fare(u), mie_in_attesa=mie_richieste_in_attesa(u["id"]),
                            prodotti=prodotti(), conti={p["id"]: nome_completo(p)
                                                        for p in elenco_saldi()},
@@ -1928,6 +1983,9 @@ def admin():
                            n_oltre=sum(1 for p in persone_neg
                                        if limite_debito()[0] and p["saldo"] < -limite_debito()[0]),
                            n_da_approvare=conta_da_fare(g.utente),
+                           comunicazioni=comunicazioni_admin(), max_testo=MAX_TESTO_COMUNICAZIONE,
+                           n_con_accesso=sum(1 for p in righe if p["attivo"] and not p["speciale"]
+                                             and p["pin_hash"] and p["approvato"]),
                            n_senza_email=sum(1 for p in persone_neg if not p["email"]),
                            manutenzioni=manutenzioni_con_stato(solo_attive=False),
                            storico_manutenzioni=db().execute("""
@@ -2352,6 +2410,47 @@ def bilancio_magazzino():
 def admin_bilancio():
     elenco, per_prod, totali = bilancio_magazzino()
     return render_template("bilancio.html", articoli=elenco, prodotti=per_prod, totali=totali)
+
+
+MAX_TESTO_COMUNICAZIONE = 1000
+
+
+def comunicazioni_admin():
+    """Ultime comunicazioni con quante persone le hanno lette (su quelle che possono entrare)."""
+    return db().execute("""
+        SELECT c.*, p.nome, p.cognome,
+               (SELECT COUNT(*) FROM comunicazioni_lette l JOIN persone q ON q.id = l.persona_id
+                WHERE l.comunicazione_id = c.id AND q.attivo = 1 AND q.speciale = 0) AS lette
+        FROM comunicazioni c LEFT JOIN persone p ON p.id = c.autore_id
+        ORDER BY c.id DESC LIMIT 15""").fetchall()
+
+
+@app.post("/admin/comunicazione/nuova")
+@admin_richiesto
+def admin_comunicazione_nuova():
+    testo = request.form.get("testo", "").strip()
+    if not testo or len(testo) > MAX_TESTO_COMUNICAZIONE:
+        flash(_("Scrivi il testo della comunicazione (al massimo {n} caratteri).", n=MAX_TESTO_COMUNICAZIONE),
+              "errore")
+        return redirect(url_for("admin") + "#comunicazioni")
+    with db():
+        cid = db().execute("INSERT INTO comunicazioni (ts, autore_id, testo) VALUES (?,?,?)",
+                           (adesso(), g.utente["id"], testo)).lastrowid
+        # chi la scrive l'ha già letta
+        db().execute("INSERT INTO comunicazioni_lette VALUES (?,?,?)", (cid, g.utente["id"], adesso()))
+    flash(_("Comunicazione pubblicata: la vedono tutti in home finché non spuntano «Ho letto»."), "ok")
+    return redirect(url_for("admin") + "#comunicazioni")
+
+
+@app.post("/admin/comunicazione/<int:cid>/ritira")
+@admin_richiesto
+def admin_comunicazione_ritira(cid):
+    with db():
+        n = db().execute("UPDATE comunicazioni SET attiva=0 WHERE id=?", (cid,)).rowcount
+    if not n:
+        abort(404)
+    flash(_("Comunicazione ritirata: non compare più a nessuno."), "ok")
+    return redirect(url_for("admin") + "#comunicazioni")
 
 
 @app.post("/admin/acquisto-per")

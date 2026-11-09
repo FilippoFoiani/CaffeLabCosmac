@@ -42,6 +42,10 @@
     document.querySelectorAll('[data-conferma]').forEach(function (el) {
       el.addEventListener('click', function (e) { if (!confirm(el.dataset.conferma)) { e.preventDefault(); } });
     });
+    // Caselle e menu che inviano il modulo appena si cambiano (es. la spunta «Ho letto»)
+    document.querySelectorAll('[data-invia-subito]').forEach(function (el) {
+      el.addEventListener('change', function () { el.form.submit(); });
+    });
     // Evita il doppio invio dei moduli (doppio tocco)
     document.querySelectorAll('form').forEach(function (f) {
       f.addEventListener('submit', function () {

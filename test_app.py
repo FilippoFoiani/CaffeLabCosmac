@@ -942,6 +942,58 @@ def test_bilancio_magazzino():
         modulo.db().commit()
 
 
+def test_novita_e_comunicazioni():
+    """Notifiche in home che si tolgono con «Ho letto»: novità dell'aggiornamento e comunicazioni degli admin."""
+    from html import unescape
+    from novita import NOVITA
+    # novita.py: id unici dal più recente, ogni voce con le stesse righe in italiano e in inglese
+    ids = [n["id"] for n in NOVITA]
+    assert ids == sorted(set(ids), reverse=True)
+    assert all(len(n["it"]) == len(n["en"]) > 0 for n in NOVITA)
+    vit = app.test_client()
+    entra(vit, "Vittorio")
+
+    def home(client):
+        return unescape(client.get("/").get_data(as_text=True))
+
+    def account(creato, letta=""):
+        with app.app_context():
+            modulo.db().execute("UPDATE persone SET novita_lette=?, creato=? WHERE id=?",
+                                (letta, creato, id_di("Vittorio")))
+            modulo.db().commit()
+    account("2026-01-01T08:00:00+00:00")                        # account di prima dell'aggiornamento
+    assert "Novità dell'aggiornamento" in home(vit) and NOVITA[0]["it"][0] in home(vit)
+    tok, _ = csrf(vit, "/")
+    vit.post("/novita/lette", data={"_csrf": tok, "letto": "1"})
+    assert NOVITA[0]["it"][0] not in home(vit)
+    account("2099-01-01T08:00:00+00:00")                        # account nuovo: per lui non sono novità
+    assert NOVITA[0]["it"][0] not in home(vit)
+    account("2026-01-01T08:00:00+00:00")                        # in inglese le righe inglesi
+    vit.get("/lingua/en")
+    assert NOVITA[0]["en"][0] in home(vit)
+    vit.get("/lingua/it")
+    vit.post("/novita/lette", data={"_csrf": tok, "letto": "1"})
+    # comunicazioni: le scrive solo un admin, il testo vuoto non passa
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin")
+    assert vit.post("/admin/comunicazione/nuova", data={"_csrf": tok, "testo": "ciao"}).status_code == 403
+    admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "   "})
+    with app.app_context():
+        assert modulo.db().execute("SELECT COUNT(*) FROM comunicazioni").fetchone()[0] == 0
+    admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "Domani niente caffè\nfino alle 11"})
+    with app.app_context():
+        cid = modulo.db().execute("SELECT MAX(id) FROM comunicazioni").fetchone()[0]
+    nick = app.test_client()
+    entra(nick, "Nick")
+    assert "Domani niente caffè" in home(vit) and "Domani niente caffè" in home(nick)
+    assert "Domani niente caffè" not in home(admin)             # chi l'ha scritta l'ha già letta
+    vit.post(f"/comunicazione/{cid}/letta", data={"_csrf": tok, "letto": "1"})
+    assert "Domani niente caffè" not in home(vit) and "Domani niente caffè" in home(nick)
+    assert "letta da 2 su" in unescape(admin.get("/admin").get_data(as_text=True))
+    admin.post(f"/admin/comunicazione/{cid}/ritira", data={"_csrf": toka})
+    assert "Domani niente caffè" not in home(nick)
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

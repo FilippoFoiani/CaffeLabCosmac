@@ -139,6 +139,7 @@ PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda: si 
   - *Compra uno dei beni*: apre «Ho comprato per il gruppo».
   Si può nascondere fino al lunedì successivo con «Ho capito».
 - **Profilo ed email**: la propria email per ricevere l'avviso anche per posta, e (facoltativi) **PayPal** e **IBAN** per dire come si vuole essere pagati. Come si imposta: vedi il passo 6 qui sopra.
+- **Novità e comunicazioni**: dopo ogni aggiornamento in home compare il riquadro blu **«Novità dell'aggiornamento»** con le novità in breve: si spunta **Ho letto** e sparisce fino all'aggiornamento successivo. Le comunicazioni degli amministratori compaiono allo stesso modo in un riquadro viola 📣, una per volta, ognuna con la sua spunta.
 - **Scheda della persona**: toccando un nome in *Saldi di tutti* (o tra chi è in credito nell'avviso del lunedì) si apre la sua scheda con nome, cognome, saldo e come vuole essere pagato. In *Pagamenti tra persone* la scheda compare da sola appena si sceglie la persona. PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, e non finiscono nell'Excel.
 - **Lingua**: in alto a destra ci sono **IT / EN**. La scelta resta salvata per ogni persona (anche le email del lunedì arrivano nella sua lingua); al primo accesso l'app usa la lingua del telefono. Il cartello con il QR è in italiano e in inglese.
 - **Dopo ogni caffè** compare: «Ricorda di lasciare pulito dopo aver consumato il caffè!».
@@ -147,6 +148,7 @@ PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda: si 
 Per l'amministratore:
 
 - **Nuovi accessi**: il primo accesso di ogni persona (e ogni nuova registrazione) resta in attesa finché un amministratore non lo approva da *Richieste*. Se qualcuno attiva l'account di un altro, rifiutalo: l'account torna libero per il vero proprietario. Chi era già entrato prima di questo aggiornamento resta attivo.
+- **Comunicazioni a tutti** (*Amministrazione*, in alto): scrivi il testo e premi **Pubblica**. Compare in home a tutti come notifica finché ognuno non spunta *Ho letto*; nell'elenco vedi da quante persone è stata letta. Con **Ritira** sparisce per tutti.
 - **Registro approvazioni** (*Amministrazione → Registro approvazioni*, solo admin): per ogni accesso, spesa e pagamento approvato, rifiutato o annullato mostra chi l'ha chiesto, chi ha deciso e quando, con lo scontrino se c'è. Lo storico completo è anche nel foglio *Approvazioni* dell'Excel, che compare solo quando lo scarica un admin. Le spese di un admin e i suoi versamenti ai conti comuni (che valgono subito) compaiono come "registrata direttamente dall'admin". Gli accessi approvati prima di questo aggiornamento non sono nel registro.
 - **Limite di debito**: in *Amministrazione* scegli l'importo (0 = nessun limite) e cosa succede oltre il limite: *avvisa e chiedi conferma* (consigliato) oppure *blocca gli acquisti*. Chi è oltre il limite vede un avviso rosso fisso.
 - **Magazzino** (*Amministrazione → Magazzino*): per ogni articolo (cialde, bottiglie, bicchierini, e altri che puoi aggiungere) la quantità scende da sola a ogni acquisto e sale quando approvi una spesa con la merce. Ogni caffè scala 1 cialda e 1 bicchierino, ogni acqua (anche quella per la macchinetta) 1 bottiglia, ogni bicchierino vuoto 1 bicchierino: si cambia nella tabella *Cosa consuma ogni prodotto*. Quando conti i pezzi veri scrivili in *Pezzi contati*: la differenza resta nel registro. Quando un articolo arriva alla **soglia**, gli amministratori e chi è in debito vedono in home il riquadro «Sta finendo la merce» con il pulsante per registrare l'acquisto. Finché un articolo non è stato contato almeno una volta l'avviso non compare.
@@ -160,10 +162,20 @@ Per l'amministratore:
 - **Ogni mese**: il piano gratuito spegne la web app se non viene rinnovata. Entra nella scheda **Web** e premi il pulsante per estenderla (*Run until 1 month from today*). Conviene mettersi un promemoria.
 - **Backup**: arriva da solo ogni lunedì per email agli amministratori (vedi sopra). Conserva quelle email, magari in una cartella apposta. In qualsiasi momento puoi anche scaricarlo da *Amministrazione → Backup*.
 - **Aggiornare l'app** (nuova versione dello zip) senza perdere niente: persone, saldi e movimenti stanno solo in `dati/`, che lo zip non contiene mai.
-  1. *Amministrazione → Backup* (per prudenza);
-  2. scheda **Files** → carica il nuovo `caffe-lab.zip` nella cartella principale;
-  3. **Consoles → Bash**: `unzip -o caffe-lab.zip` (sovrascrive solo il codice; se lo zip contiene anche `requirements.txt` nuovo, poi `pip3.12 install --user -r caffe-lab/requirements.txt`);
-  4. scheda **Web** → **Reload**.
+  1. **Prepara lo zip** sul PC, dalla cartella della repository (dopo il commit):
+     `git -c core.autocrlf=false archive --format=zip --prefix=caffe-lab/ -o ../caffe-lab_AAAA-MM-GG.zip HEAD`.
+     Non usare «Download ZIP» di GitHub: dentro la cartella si chiamerebbe `CaffeLabCosmac-main` e sul server resterebbe la versione vecchia.
+     Se l'aggiornamento cambia qualcosa che si vede, prima aggiungi due righe in cima a `novita.py`: compaiono a tutti nel riquadro «Novità dell'aggiornamento».
+  2. scheda **Files** → carica lo zip nella cartella principale;
+  3. **Consoles → Bash**, un comando alla volta (backup del database, scompatta lo zip più recente sopra il codice, riavvia):
+     ```bash
+     cd ~
+     python3.12 -c "import sqlite3,datetime; s=sqlite3.connect('caffe-lab/dati/caffe.db'); n=f'caffe_backup_{datetime.datetime.now():%Y-%m-%d_%H%M}.db'; d=sqlite3.connect(n); s.backup(d); d.close(); print('Backup OK:', n)"
+     ZIP=$(ls -t caffe-lab*.zip | head -1); echo "Uso: $ZIP"
+     unzip -o "$ZIP"
+     touch /var/www/*_wsgi.py && echo "OK: aggiornato e riavviato"
+     ```
+     Se lo zip contiene un `requirements.txt` cambiato, prima del riavvio: `pip3.12 install --user -r caffe-lab/requirements.txt`.
   Al riavvio l'app aggiunge da sola le tabelle e le colonne nuove al database. **Non** rilanciare `gestione.py importa`. Il file WSGI non viene toccato.
   Dopo l'aggiornamento che introduce il magazzino: vai in *Amministrazione → Magazzino*, conta cialde, bottiglie e bicchierini e scrivi le quantità in *Pezzi contati*, poi controlla le soglie.
   Se avevi già installato una versione precedente, i saldi del nuovo file aggiungili da *Amministrazione → Rettifica*, oppure ricomincia da zero: cancella la cartella `dati/` **solo se** nell'app non c'è ancora niente di importante, poi rifai l'import.
