@@ -261,6 +261,27 @@ EN = {
         "The administrator hasn't turned on emails yet: you'll still see the reminder here in the app.",
     "Indirizzo email non valido.": "Invalid email address.",
     "Profilo aggiornato.": "Profile updated.",
+    # --- come essere pagati e scheda della persona ---
+    "Come vuoi essere pagato": "How you want to be paid",
+    "Facoltativo. Quello che scrivi qui compare nella tua scheda, che vede chi ha fatto l'accesso all'app quando deve darti dei soldi. Lascia vuoto per non mostrarlo.":
+        "Optional. What you enter here appears on your card, which anyone logged in to the app sees when they need to give you money. Leave it empty to keep it hidden.",
+    "nome di paypal.me oppure email": "paypal.me name or email",
+    "PayPal non valido: scrivi il tuo nome di paypal.me (es. mariorossi) oppure l'email del conto PayPal.":
+        "Invalid PayPal: enter your paypal.me name (e.g. mariorossi) or the email of your PayPal account.",
+    "IBAN non valido: controlla che sia completo e senza errori di battitura.":
+        "Invalid IBAN: check that it is complete and has no typos.",
+    "Vedi la tua scheda": "See your card",
+    "Modifica nel profilo": "Edit in your profile",
+    "Saldo": "Balance",
+    "in debito": "in debt",
+    "in credito": "in credit",
+    "in pari": "even",
+    "Come pagare": "How to pay",
+    "Conto comune: metti i soldi nella cassa.": "Shared account: put the money in the cash box.",
+    "Non ha indicato come preferisce essere pagato: chiediglielo.":
+        "No preferred payment method given: ask them.",
+    "Ho dato dei soldi a {nome}": "I gave money to {nome}",
+    "Apri la scheda": "Open the card",
     "Torna indietro": "Back",
 
     # --- descrizioni dei movimenti ---

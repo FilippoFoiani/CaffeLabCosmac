@@ -8,6 +8,7 @@ movimenti non annullati. Saldo positivo = credito, negativo = debito.
 import io
 import json
 import os
+import re
 import secrets
 import smtplib
 import sqlite3
@@ -218,7 +219,10 @@ def inizializza_db():
                           ("richiesta_ts", "TEXT NOT NULL DEFAULT ''"),
                           ("nuovo_nome", "TEXT NOT NULL DEFAULT ''"),
                           ("nuovo_cognome", "TEXT NOT NULL DEFAULT ''"),
-                          ("nuovo_account", "INTEGER NOT NULL DEFAULT 0")):
+                          ("nuovo_account", "INTEGER NOT NULL DEFAULT 0"),
+                          # come vuole essere pagato (facoltativi, visibili nella sua scheda)
+                          ("paypal", "TEXT NOT NULL DEFAULT ''"),
+                          ("iban", "TEXT NOT NULL DEFAULT ''")):
             if col not in colonne_p:
                 con.execute(f"ALTER TABLE persone ADD COLUMN {col} {tipo}")
         # Le prime email partiranno dal prossimo lunedì, non appena si installa l'app
@@ -326,12 +330,40 @@ def email_valida(e):
     return e if (len(e) <= 120 and "@" in e and "." in e.split("@")[-1] and " " not in e) else ""
 
 
+def iban_valido(testo):
+    """IBAN senza spazi e in maiuscolo se il codice di controllo torna, altrimenti ''."""
+    t = re.sub(r"[\s-]", "", testo or "").upper()
+    if not re.fullmatch(r"[A-Z]{2}\d{2}[A-Z0-9]{11,30}", t):
+        return ""
+    numero = "".join(str(int(c, 36)) for c in t[4:] + t[:4])
+    return t if int(numero) % 97 == 1 else ""
+
+
+def iban_leggibile(iban):
+    return " ".join(iban[i:i + 4] for i in range(0, len(iban or ""), 4))
+
+
+def paypal_valido(testo):
+    """Nome di paypal.me (anche incollato come link) oppure email del conto PayPal; '' se non valido."""
+    t = re.sub(r"^(https?://)?(www\.)?paypal\.me/", "", (testo or "").strip(), flags=re.I).strip("/@ ")
+    if "@" in t:
+        return email_valida(t)
+    return t if re.fullmatch(r"[A-Za-z0-9]{1,20}", t) else ""
+
+
+def paypal_link(paypal):
+    """Link paypal.me per un nome utente; per un'email non c'è un link diretto."""
+    return "" if not paypal or "@" in paypal else f"https://paypal.me/{paypal}"
+
+
 def nome_completo(p):
     if p is None:
         return "?"
     return f"{p['nome']} {p['cognome']}".strip()
 
 
+app.jinja_env.filters["iban"] = iban_leggibile
+app.jinja_env.filters["paypal_link"] = paypal_link
 app.jinja_env.filters["euro"] = euro
 app.jinja_env.filters["ora"] = ora_locale
 app.jinja_env.filters["nome"] = nome_completo
@@ -976,15 +1008,36 @@ def profilo():
     if request.method == "POST":
         testo = request.form.get("email", "").strip()
         email = email_valida(testo)
+        testo_paypal = request.form.get("paypal", "").strip()
+        paypal = paypal_valido(testo_paypal)
+        testo_iban = request.form.get("iban", "").strip()
+        iban = iban_valido(testo_iban)
+        errore = None
         if testo and not email:
-            flash(_("Indirizzo email non valido."), "errore")
-            return redirect(url_for("profilo"))
+            errore = _("Indirizzo email non valido.")
+        elif testo_paypal and not paypal:
+            errore = _("PayPal non valido: scrivi il tuo nome di paypal.me (es. mariorossi) oppure l'email del conto PayPal.")
+        elif testo_iban and not iban:
+            errore = _("IBAN non valido: controlla che sia completo e senza errori di battitura.")
+        if errore:
+            flash(errore, "errore")
+            return render_template("profilo.html", email_attiva=email_configurata(), form=request.form)
         with db():
-            db().execute("UPDATE persone SET email=?, avvisi_email=? WHERE id=?",
-                         (email, 1 if request.form.get("avvisi_email") else 0, u["id"]))
+            db().execute("UPDATE persone SET email=?, avvisi_email=?, paypal=?, iban=? WHERE id=?",
+                         (email, 1 if request.form.get("avvisi_email") else 0, paypal, iban, u["id"]))
         flash(_("Profilo aggiornato."), "ok")
         return redirect(url_for("home"))
-    return render_template("profilo.html", email_attiva=email_configurata())
+    return render_template("profilo.html", email_attiva=email_configurata(),
+                           form={"email": u["email"], "paypal": u["paypal"], "iban": iban_leggibile(u["iban"]),
+                                 "avvisi_email": u["avvisi_email"]})
+
+
+@app.get("/persona/<int:pid>")
+@login_richiesto
+def scheda_persona(pid):
+    """Scheda pubblica (per chi ha fatto l'accesso): nome, saldo e come vuole essere pagato."""
+    p = next((r for r in elenco_saldi(includi_inattivi=True) if r["id"] == pid), None) or abort(404)
+    return render_template("persona.html", p=p)
 
 
 @app.route("/spesa", methods=["GET", "POST"])

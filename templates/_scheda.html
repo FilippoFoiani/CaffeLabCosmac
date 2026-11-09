@@ -1,0 +1,22 @@
+{# Scheda di una persona: nome, cognome, saldo e come vuole essere pagato.
+   p è una riga di elenco_saldi() (ha anche p.saldo). Usata in persona.html e paga.html. #}
+{% macro scheda_persona(p) %}
+<dl class="scheda-persona">
+  <dt>{{ _('Nome') }}</dt><dd>{{ p.nome }}</dd>
+  {% if not p.speciale %}<dt>{{ _('Cognome') }}</dt><dd>{{ p.cognome or '—' }}</dd>{% endif %}
+  <dt>{{ _('Saldo') }}</dt>
+  <dd><strong class="importo {% if p.saldo < 0 %}neg{% elif p.saldo > 0 %}pos{% endif %}">{{ p.saldo|euro }}</strong>
+    <span class="piccolo">{% if p.saldo < 0 %}{{ _('in debito') }}{% elif p.saldo > 0 %}{{ _('in credito') }}{% else %}{{ _('in pari') }}{% endif %}</span></dd>
+  <dt>{{ _('Come pagare') }}</dt>
+  <dd>
+    {% if p.speciale %}
+      <span class="aiuto">{{ _('Conto comune: metti i soldi nella cassa.') }}</span>
+    {% elif p.paypal or p.iban %}
+      {% if p.paypal %}<div>PayPal: {% if p.paypal|paypal_link %}<a href="{{ p.paypal|paypal_link }}" target="_blank" rel="noopener">paypal.me/{{ p.paypal }}</a>{% else %}<span class="copiabile">{{ p.paypal }}</span>{% endif %}</div>{% endif %}
+      {% if p.iban %}<div>IBAN: <code class="copiabile">{{ p.iban|iban }}</code></div>{% endif %}
+    {% else %}
+      <span class="aiuto">{{ _('Non ha indicato come preferisce essere pagato: chiediglielo.') }}</span>
+    {% endif %}
+  </dd>
+</dl>
+{% endmacro %}

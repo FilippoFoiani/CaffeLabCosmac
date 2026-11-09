@@ -122,7 +122,8 @@ Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSG
   - *Compra il credito di un altro*: stesso modulo con l'importo, scegli tu la persona in credito (sono elencate nel riquadro);
   - *Compra uno dei beni*: apre «Ho comprato per il gruppo».
   Si può nascondere fino al lunedì successivo con «Ho capito».
-- **Profilo ed email**: la propria email per ricevere l'avviso anche per posta.
+- **Profilo ed email**: la propria email per ricevere l'avviso anche per posta, e (facoltativi) **PayPal** e **IBAN** per dire come si vuole essere pagati. L'IBAN viene controllato: se c'è un errore di battitura non viene salvato.
+- **Scheda della persona**: toccando un nome in *Saldi di tutti* (o tra chi è in credito nell'avviso del lunedì) si apre la sua scheda con nome, cognome, saldo e come vuole essere pagato. In *Pagamenti tra persone* la scheda compare da sola appena si sceglie la persona. PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, e non finiscono nell'Excel.
 - **Lingua**: in alto a destra ci sono **IT / EN**. La scelta resta salvata per ogni persona (anche le email del lunedì arrivano nella sua lingua); al primo accesso l'app usa la lingua del telefono. Il cartello con il QR è in italiano e in inglese.
 - **Dopo ogni caffè** compare: «Ricorda di lasciare pulito dopo aver consumato il caffè!».
 - Chi ha dimenticato il PIN o ha cambiato telefono: l'amministratore lo azzera dalla sua scheda.

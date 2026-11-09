@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_scheda.html" import scheda_persona %}
 {% block titolo %}{{ _('Pagamenti') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>{{ _('Pagamenti tra persone') }}</h1>
@@ -30,6 +31,13 @@
       </option>
     {% endfor %}
   </select>
+  {# La scheda della persona scelta compare qui sotto (le altre restano nascoste) #}
+  {% for p in altri %}
+  <div class="scheda-scelta" data-persona="{{ p.id }}" {% if form.get('controparte')|string != p.id|string %}hidden{% endif %}>
+    {{ scheda_persona(p) }}
+    <a class="piccolo" href="{{ url_for('scheda_persona', pid=p.id) }}">{{ _('Apri la scheda') }} →</a>
+  </div>
+  {% endfor %}
 
   <label for="importo">{{ _('Importo (€)') }}</label>
   <input id="importo" name="importo" inputmode="decimal" placeholder="{{ _('es. 5 oppure 2,50') }}" required
@@ -56,6 +64,9 @@
     function aggiorna() {
       var verso = f.querySelector('input[name=verso]:checked');
       var sel = f.controparte.options[f.controparte.selectedIndex];
+      f.querySelectorAll('.scheda-scelta').forEach(function (s) {
+        s.hidden = !sel || s.dataset.persona !== sel.value;
+      });
       var imp = Math.round(parseFloat((f.importo.value || '').replace(',', '.')) * 100);
       if (!verso || !sel || !sel.value || !(imp > 0)) { out.hidden = true; return; }
       var saldoAltro = parseInt(sel.dataset.saldo, 10);

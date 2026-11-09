@@ -15,7 +15,7 @@
   {% for r in righe %}
   <li class="{% if r.id == utente.id %}io{% endif %}{% if not r.attivo %} spento{% endif %}">
     <div>
-      <div>{{ r|nome }}{% if r.speciale %} <span class="etichetta">{{ _('conto') }}</span>{% endif %}{% if not r.attivo %} <span class="etichetta">{{ _('non attivo') }}</span>{% endif %}</div>
+      <div><a href="{{ url_for('scheda_persona', pid=r.id) }}" class="nome-link">{{ r|nome }}</a>{% if r.speciale %} <span class="etichetta">{{ _('conto') }}</span>{% endif %}{% if not r.attivo %} <span class="etichetta">{{ _('non attivo') }}</span>{% endif %}</div>
       {% set c = conteggi.get(r.id, {}) %}
       <div class="piccolo">{% for p in prodotti if c.get(p.id) %}{{ p.emoji }} {{ c[p.id] }}{% if not loop.last %} · {% endif %}{% else %}{{ _('nessun acquisto') }}{% endfor %}</div>
     </div>

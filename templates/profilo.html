@@ -3,15 +3,25 @@
 {% block contenuto %}
 <h1>{{ _('Profilo') }}</h1>
 <section class="scheda">
-  <p><strong>{{ utente|nome }}</strong></p>
+  <p><strong>{{ utente|nome }}</strong> · <a href="{{ url_for('scheda_persona', pid=utente.id) }}">{{ _('Vedi la tua scheda') }} →</a></p>
   <form method="post" action="{{ url_for('profilo') }}" class="modulo">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <label for="email">Email</label>
     <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
-           placeholder="nome.cognome@studenti.unipg.it" value="{{ utente.email }}">
-    <label class="spunta"><input type="checkbox" name="avvisi_email" value="1" {% if utente.avvisi_email %}checked{% endif %}>
+           placeholder="nome.cognome@studenti.unipg.it" value="{{ form.get('email', '') }}">
+    <label class="spunta"><input type="checkbox" name="avvisi_email" value="1" {% if form.get('avvisi_email') %}checked{% endif %}>
       {{ _("Mandami per email l'avviso del lunedì quando il mio saldo è negativo") }}</label>
     {% if not email_attiva %}<p class="aiuto">{{ _("Per ora l'amministratore non ha ancora attivato le email: l'avviso lo vedi comunque qui nell'app.") }}</p>{% endif %}
+
+    <h2>💳 {{ _('Come vuoi essere pagato') }}</h2>
+    <p class="aiuto">{{ _("Facoltativo. Quello che scrivi qui compare nella tua scheda, che vede chi ha fatto l'accesso all'app quando deve darti dei soldi. Lascia vuoto per non mostrarlo.") }}</p>
+    <label for="paypal">PayPal</label>
+    <input id="paypal" name="paypal" autocomplete="off" autocapitalize="off" spellcheck="false"
+           placeholder="{{ _('nome di paypal.me oppure email') }}" value="{{ form.get('paypal', '') }}">
+    <label for="iban">IBAN</label>
+    <input id="iban" name="iban" autocomplete="off" autocapitalize="characters" spellcheck="false"
+           placeholder="IT60 X054 2811 1010 0000 0123 456" value="{{ form.get('iban', '') }}">
+
     <button type="submit" class="btn">{{ _('Salva') }}</button>
   </form>
   <p class="aiuto">{{ _('Lingua') }}: <a href="{{ url_for('cambia_lingua', codice='it') }}">Italiano</a> · <a href="{{ url_for('cambia_lingua', codice='en') }}">English</a></p>

@@ -709,6 +709,46 @@ def test_versamento_di_un_admin_alla_cassa_vale_subito():
     assert saldo_di("Filippo") == prima + 100
 
 
+def test_metodo_di_pagamento_nella_scheda():
+    """Issue #5: PayPal e IBAN nel profilo, visibili nella scheda della persona e in Pagamenti."""
+    giulia = app.test_client()
+    entra(giulia, "Giulia")
+    tok, _ = csrf(giulia, "/profilo")
+    # IBAN con codice di controllo sbagliato: rifiutato, e quello che hai scritto resta nel modulo
+    r = giulia.post("/profilo", data={"_csrf": tok, "iban": "IT61 X054 2811 1010 0000 0123 456"})
+    assert "IBAN non valido" in r.get_data(as_text=True) and "IT61 X054" in r.get_data(as_text=True)
+    assert "PayPal non valido" in giulia.post("/profilo", data={"_csrf": tok, "paypal": "mario rossi!"}
+                                             ).get_data(as_text=True)
+    giulia.post("/profilo", data={"_csrf": tok, "paypal": "https://www.paypal.me/GiuliaT/",
+                                  "iban": "it60 x054 2811 1010 0000 0123 456"})
+    with app.app_context():
+        p = modulo.persona(id_di("Giulia"))
+        assert (p["paypal"], p["iban"]) == ("GiuliaT", "IT60X0542811101000000123456")
+    # un altro la vede nella scheda e in Pagamenti appena la sceglie
+    nick = app.test_client()
+    entra(nick, "Nick")
+    scheda = nick.get(f"/persona/{id_di('Giulia')}").get_data(as_text=True)
+    assert "https://paypal.me/GiuliaT" in scheda and "IT60 X054 2811 1010 0000 0123 456" in scheda
+    assert f'href="/paga?verso=dato&amp;a={id_di("Giulia")}"' in scheda
+    paga = nick.get(f"/paga?a={id_di('Giulia')}").get_data(as_text=True)
+    assert f'data-persona="{id_di("Giulia")}" >' in paga and "IT60 X054" in paga
+    # nei Saldi c'è solo il link alla scheda, non i dati di pagamento; niente nell'Excel
+    saldi = nick.get("/saldi").get_data(as_text=True)
+    assert f"/persona/{id_di('Giulia')}" in saldi and "IT60" not in saldi and "GiuliaT" not in saldi
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(nick.get("/export.xlsx").data))
+    assert not any("IT60X054" in str(c.value) for ws in wb for row in ws.iter_rows() for c in row)
+    # chi non l'ha indicato, conti comuni, persone che non esistono, chi non ha fatto l'accesso
+    assert "chiediglielo" in nick.get(f"/persona/{id_di('Nick')}").get_data(as_text=True)
+    assert "Conto comune" in nick.get(f"/persona/{id_di('Cassa')}").get_data(as_text=True)
+    assert nick.get("/persona/99999").status_code == 404
+    assert app.test_client().get(f"/persona/{id_di('Giulia')}").status_code == 302
+    # un'email PayPal si salva così com'è; svuotando i campi spariscono
+    giulia.post("/profilo", data={"_csrf": tok, "paypal": "giulia@example.com", "iban": ""})
+    scheda = nick.get(f"/persona/{id_di('Giulia')}").get_data(as_text=True)
+    assert "giulia@example.com" in scheda and "paypal.me/" not in scheda and "IT60" not in scheda
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

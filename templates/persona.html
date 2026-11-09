@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_scheda.html" import scheda_persona %}
+{% block titolo %}{{ p|nome }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>{{ p|nome }}{% if p.speciale %} <span class="etichetta">{{ _('conto') }}</span>{% endif %}{% if not p.attivo %} <span class="etichetta">{{ _('non attivo') }}</span>{% endif %}</h1>
+<section class="scheda">
+  {{ scheda_persona(p) }}
+  {% if p.id == utente.id %}
+    <p class="aiuto"><a href="{{ url_for('profilo') }}">✏️ {{ _('Modifica nel profilo') }}</a></p>
+  {% elif p.attivo %}
+    <a class="btn" href="{{ url_for('paga', verso='dato', a=p.id) }}">💶 {{ _('Ho dato dei soldi a {nome}', nome=p|nome) }}</a>
+  {% endif %}
+</section>
+<p class="aiuto centro"><a href="{{ url_for('saldi') }}">← {{ _('Saldi di tutti') }}</a></p>
+{% endblock %}
