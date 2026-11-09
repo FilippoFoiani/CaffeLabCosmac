@@ -662,6 +662,53 @@ def test_email_backup_in_inglese():
     assert "Ciao" not in corpo and "allegato" not in corpo
 
 
+def test_pagamento_di_un_admin_lo_conferma_chi_riceve():
+    """Issue #1: anche quando paga un admin conferma chi ha ricevuto i soldi. Un altro admin
+    può confermare solo se la richiesta è ferma da più di 3 giorni; nessuno conferma un proprio pagamento."""
+    admin = entra_come_admin()
+    marco = app.test_client()
+    entra(marco, "Marco")
+    prima = saldo_di("Filippo"), saldo_di("Marco")
+    tok, html = csrf(admin, "/paga")
+    admin.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
+                              "controparte": id_di("Marco"), "importo": "2"})
+    assert (saldo_di("Filippo"), saldo_di("Marco")) == prima          # non vale ancora
+    rid = richiesta_in_attesa("pagamento")
+    assert "Hai 1 richiesta da confermare" in marco.get("/").get_data(as_text=True)
+    assert admin.post(f"/richieste/{rid}/approva", data={"_csrf": tok}).status_code == 403
+    # un secondo admin non può intervenire finché la richiesta non è ferma da più di 3 giorni
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET admin=1 WHERE id=?", (id_di("Massi"),))
+        modulo.db().commit()
+    try:
+        altro = app.test_client()
+        entra(altro, "Massi")
+        tokm, _ = csrf(altro, "/richieste")
+        assert altro.post(f"/richieste/{rid}/approva", data={"_csrf": tokm}).status_code == 403
+        with app.app_context():
+            modulo.db().execute("UPDATE richieste SET ts=? WHERE id=?",
+                                ("2026-01-01T08:00:00+00:00", rid))
+            modulo.db().commit()
+        # chi ha pagato non può confermare nemmeno dopo 3 giorni
+        assert admin.post(f"/richieste/{rid}/approva", data={"_csrf": tok}).status_code == 403
+        assert "ferma da più di 3 giorni" in altro.get("/richieste").get_data(as_text=True)
+        altro.post(f"/richieste/{rid}/approva", data={"_csrf": tokm})
+        assert (saldo_di("Filippo"), saldo_di("Marco")) == (prima[0] + 200, prima[1] - 200)
+    finally:
+        with app.app_context():
+            modulo.db().execute("UPDATE persone SET admin=0 WHERE id=?", (id_di("Massi"),))
+            modulo.db().commit()
+
+
+def test_versamento_di_un_admin_alla_cassa_vale_subito():
+    admin = entra_come_admin()
+    prima = saldo_di("Filippo")
+    tok, html = csrf(admin, "/paga")
+    admin.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
+                              "controparte": id_di("Cassa"), "importo": "1"})
+    assert saldo_di("Filippo") == prima + 100
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

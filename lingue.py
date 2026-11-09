@@ -468,6 +468,8 @@ EN = {
         "Requests",
     "Conta quando l'altra persona conferma di aver ricevuto i soldi (per la Cassa conferma un amministratore).":
         "It counts once the other person confirms they received the money (for the Cash box an administrator confirms).",
+    "Conta quando l'altra persona conferma di aver ricevuto i soldi. I versamenti ai conti comuni valgono subito.":
+        "It counts once the other person confirms they received the money. Payments to shared accounts count right away.",
     "Per sicurezza un amministratore deve approvare il tuo primo accesso: dopo potrai usare l'app.":
         "For security, an administrator has to approve your first login: then you can use the app.",
     "Nuovi accessi da approvare":

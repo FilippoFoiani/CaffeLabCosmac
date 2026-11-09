@@ -43,6 +43,7 @@ PRODOTTI_DEFAULT = [
      "prezzo": 25, "conto": "Conto Caffè"},
 ]
 FINESTRA_ANNULLA = timedelta(minutes=10)   # entro quanto si può annullare da soli
+ATTESA_MAX_PAGAMENTO = timedelta(days=3)   # poi un pagamento non confermato lo può confermare un admin
 MAX_TENTATIVI_PIN = 5
 DURATA_BLOCCO = timedelta(minutes=10)
 MAX_QTA_PER_VOLTA = 20             # per ciascun prodotto in un singolo acquisto
@@ -931,8 +932,9 @@ def paga():
         n_io, n_altro = nome_completo(u), nome_completo(altro)
         extra = f" – {nota}" if nota else ""
         gruppo = uuid.uuid4().hex
-        if verso == "dato" and not u["admin"]:
-            # il saldo dell'altro scende: conta solo quando lui (o l'admin, per i conti comuni) conferma
+        if verso == "dato" and not (u["admin"] and altro["speciale"]):
+            # il saldo dell'altro scende: conta solo quando lui (o l'admin, per i conti comuni) conferma.
+            # Vale anche se paga un admin: nessuno conferma da solo un proprio pagamento.
             with db():
                 db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, controparte_id, "
                              "importo_cent, nota) VALUES (?, 'pagamento', ?, ?, ?, ?)",
@@ -944,7 +946,7 @@ def paga():
                         nome=n_altro), "ok")
             return redirect(url_for("home"))
         with db():
-            if verso == "dato":         # qui arriva solo un admin: vale subito, ma resta nel registro
+            if verso == "dato":         # solo un admin che versa a un conto comune: vale subito, ma resta nel registro
                 registra_pagamento(u, altro, importo, nota, gruppo)
                 db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, controparte_id, importo_cent, "
                              "nota, stato, deciso_da, deciso_ts) VALUES (?, 'pagamento', ?, ?, ?, ?, "
@@ -1067,20 +1069,34 @@ def salva_scontrino(file):
     return nome
 
 
+def richiesta_ferma(r):
+    """True se la richiesta aspetta da più di ATTESA_MAX_PAGAMENTO."""
+    return datetime.now(timezone.utc) - da_iso(r["ts"]) > ATTESA_MAX_PAGAMENTO
+
+
 def puo_decidere(r, utente):
-    """Chi può approvare una richiesta: l'admin sempre; per un pagamento anche chi ha ricevuto i soldi."""
+    """Chi può approvare una richiesta.
+    Spesa: un admin. Pagamento: chi ha ricevuto i soldi; un admin solo se i soldi sono andati
+    a un conto comune oppure se la richiesta è ferma da più di 3 giorni. Mai chi ha pagato."""
     if r["stato"] != "attesa":
         return False
-    if utente["admin"]:
+    if r["tipo"] != "pagamento":
+        return bool(utente["admin"])
+    if r["controparte_id"] == utente["id"]:
         return True
-    return r["tipo"] == "pagamento" and r["controparte_id"] == utente["id"]
+    if not utente["admin"] or r["richiedente_id"] == utente["id"]:
+        return False
+    altro = persona(r["controparte_id"])
+    return bool(altro and altro["speciale"]) or richiesta_ferma(r)
 
 
 def richieste_da_decidere(utente):
     if utente["admin"]:
-        return db().execute("SELECT * FROM richieste WHERE stato='attesa' ORDER BY id").fetchall()
-    return db().execute("SELECT * FROM richieste WHERE stato='attesa' AND tipo='pagamento' "
-                        "AND controparte_id=? ORDER BY id", (utente["id"],)).fetchall()
+        righe = db().execute("SELECT * FROM richieste WHERE stato='attesa' ORDER BY id").fetchall()
+    else:
+        righe = db().execute("SELECT * FROM richieste WHERE stato='attesa' AND tipo='pagamento' "
+                             "AND controparte_id=? ORDER BY id", (utente["id"],)).fetchall()
+    return [r for r in righe if puo_decidere(r, utente)]
 
 
 def accessi_in_attesa():
@@ -1120,8 +1136,7 @@ def richieste():
     return render_template("richieste.html", da_decidere=elenco,
                            accessi=accessi_in_attesa() if u["admin"] else [],
                            mie=mie_richieste_in_attesa(u["id"]),
-                           vecchie={r["id"] for r in elenco
-                                    if datetime.now(timezone.utc) - da_iso(r["ts"]) > timedelta(days=3)},
+                           vecchie={r["id"] for r in elenco if richiesta_ferma(r)},
                            nomi={p["id"]: nome_completo(p) for p in elenco_saldi(includi_inattivi=True)})
 
 
