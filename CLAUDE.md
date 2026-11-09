@@ -28,7 +28,7 @@ Nearly everything is in **`app.py`**, a single module: config, schema, helpers, 
 
 **Ledger model.** Every operation is a row in `movimenti` with a signed `importo_cent` (integer cents: + is credit, − is debt). A balance is always `SUM(importo_cent) WHERE annullato=0`. No balance column exists anywhere. Undo sets `annullato=1` and never deletes. Rows from one action (a multi-product purchase, or both sides of a transfer) share a `gruppo` UUID. Write through `registra()`, and `registra_pagamento()` for the two-row transfer. `tipo` is one of `acquisto | trasferimento | spesa | rettifica | iniziale`.
 
-**Shared accounts.** `persone.speciale=1` marks shared accounts (Cassa, Acqua, Conto Caffè) that cannot log in. A product with `addebito_id` set charges that account instead of the buyer.
+**Shared accounts.** `persone.speciale=1` marks shared accounts (Cassa, Acqua, Macchinetta del caffè, formerly "Conto Caffè") that cannot log in. A product with `addebito_id` set charges that account instead of the buyer, and statistics count it on that account too, as the balances do.
 
 **Approval flow.** Group expenses (`spesa`) and payments to someone else go into `richieste` with `stato='attesa'`. Ledger rows are written only when the request is approved (`decidi_richiesta`; `puo_decidere` decides who may approve). First logins and new registrations are also held (`persone.approvato=0`, which makes `g.in_attesa` and redirects to `/attesa`) until an admin approves. Decisions are logged in `registro_accessi`.
 

@@ -8,7 +8,7 @@ Prodotti di partenza (prezzi e nomi si cambiano da *Amministrazione*):
 |---|---|---|
 | ☕ Caffè | 0,30 € | chi lo prende |
 | 💧 Acqua | 0,25 € | chi la prende |
-| 🫗 Acqua macchinetta | 0,25 € | il **Conto Caffè** (conto comune creato in automatico) |
+| 🫗 Acqua macchinetta | 0,25 € | la **Macchinetta del caffè** (conto comune creato in automatico) |
 | 🥤 Bicchierino vuoto | gratis | nessuno (serve solo a contare i bicchierini) |
 
 ## Cosa c'è nella cartella
@@ -26,7 +26,7 @@ Prodotti di partenza (prezzi e nomi si cambiano da *Amministrazione*):
 ## 0. I saldi iniziali
 
 `saldi_iniziali.csv` contiene i saldi del file Excel controllato (foglio *Conto completo*). Ci sono due colonne, `saldo_caffe` e `saldo_acqua`: all'import vengono sommate nel saldo unico, ma restano visibili come due movimenti separati ("Saldo iniziale (foglio caffè)" e "(foglio acqua)").
-Acqua e Cassa sono conti comuni: compaiono nei saldi ma nessuno ci entra con il PIN. Il **Conto Caffè** (che paga l'acqua per la macchinetta) lo crea l'app da sola.
+Acqua e Cassa sono conti comuni: compaiono nei saldi ma nessuno ci entra con il PIN. La **Macchinetta del caffè** (il conto comune che paga l'acqua per la macchinetta; prima si chiamava *Conto Caffè* e l'app lo rinomina da sola) la crea l'app da sola.
 
 Se lo modifichi da Excel, salvalo come **CSV (separato da punto e virgola)**.
 
@@ -108,9 +108,23 @@ Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSG
 3. Vai su **Amministrazione → QR code**, stampa la pagina e attaccala vicino alla macchinetta.
 4. Avvisa il gruppo: la prima volta ognuno sceglie il proprio nome dall'elenco e imposta un PIN; da lì in poi basta scansionare e toccare il pulsante.
 
+## 6. Il proprio profilo: email e metodo di pagamento
+
+Ognuno lo imposta dal telefono, quando vuole (anche più volte):
+
+1. Nella pagina principale tocca **👤 Profilo ed email**.
+2. **Email**: scrivi il tuo indirizzo (es. `nome.cognome@studenti.unipg.it`). Serve per ricevere per email l'avviso del lunedì quando il saldo è negativo e, per gli amministratori, il backup settimanale. Se non vuoi l'email, togli la spunta *Mandami per email l'avviso del lunedì…*: l'avviso lo vedi comunque nell'app.
+3. **Come vuoi essere pagato** (facoltativo): serve a chi deve darti dei soldi.
+   - **PayPal**: il tuo nome di paypal.me, cioè quello dopo `paypal.me/` (es. `mariorossi`). Va bene anche incollare il link intero (`https://paypal.me/mariorossi`) oppure scrivere l'email del conto PayPal. Con il nome, nella tua scheda compare il link diretto per pagarti.
+   - **IBAN**: anche con spazi e lettere minuscole. L'app controlla le cifre di controllo: se c'è un errore di battitura non lo salva e te lo dice, così nessuno fa un bonifico sbagliato.
+4. Tocca **Salva**.
+5. Per vedere cosa vedono gli altri, tocca **Vedi la tua scheda** in cima al profilo. Per togliere PayPal o IBAN, svuota il campo e tocca **Salva**.
+
+PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda: si apre toccando il tuo nome in *Saldi di tutti* o scegliendoti in *Pagamenti tra persone*. Non compaiono nella lista dei saldi né nell'Excel. La lingua (IT / EN) si cambia in alto a destra.
+
 ## Come funziona per il gruppo
 
-- **Acquisto**: per ogni prodotto ci sono − e +; si sceglie la quantità di ciascuno e si tocca **Conferma** una volta sola. Il pulsante mostra quanto va a proprio carico (l'acqua per la macchinetta va sul Conto Caffè). Per 10 minuti si può annullare l'intero acquisto.
+- **Acquisto**: per ogni prodotto ci sono − e +; si sceglie la quantità di ciascuno e si tocca **Conferma** una volta sola. Il pulsante mostra quanto va a proprio carico (l'acqua per la macchinetta va sulla Macchinetta del caffè). Per 10 minuti si può annullare l'intero acquisto.
 - **Pagamenti tra persone**:
   - *Ho dato dei soldi a qualcuno*: se dai 5 € a chi è in credito, il tuo saldo sale di 5 € e il suo scende di 5 €. **Conta solo quando chi ha ricevuto i soldi conferma** dalla pagina *Richieste* (per la Cassa conferma un amministratore). Vale anche quando paga un amministratore: nessuno può confermare un proprio pagamento.
   - *Mi prendo il debito di qualcuno*: ti accolli una parte del debito di un altro (come Massi con Martin sul foglio). Vale subito, perché pesa solo su di te.
@@ -118,13 +132,13 @@ Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSG
 - **Richieste**: qui ognuno conferma i pagamenti ricevuti e vede le proprie richieste in attesa (che può annullare). Gli amministratori vedono anche spese e nuovi accessi da approvare, e i pagamenti tra persone fermi da più di 3 giorni, che possono confermare al posto di chi doveva riceverli (tranne i propri); in cima alla pagina principale compare un avviso quando c'è qualcosa da fare.
 - **Come funziona**: pagina con le regole, come rientrare dal debito e le linee guida per la pulizia. Si apre anche senza aver fatto l'accesso: puoi mandarne il link a chi deve iniziare.
 - **Saldi di tutti**: visibili a tutti, con il pulsante per scaricare l'**Excel** (fogli *Saldi* e *Movimenti*).
-- **Statistiche**: quanti caffè, acque e altri prodotti si consumano per giorno (ultimi 14), settimana (ultime 12), mese (ultimi 12) e anno, dal più recente, con i totali di oggi, della settimana, del mese e dell'anno e la media al giorno degli ultimi 30 giorni. Si vedono i consumi di tutti insieme o di una persona sola: sono visibili a chiunque abbia fatto l'accesso. Contano solo gli acquisti segnati nell'app (non il foglio cartaceo); l'acqua per la macchinetta conta per chi l'ha presa.
+- **Statistiche**: quanti caffè, acque e altri prodotti si consumano per giorno (ultimi 14), settimana (ultime 12), mese (ultimi 12) e anno, dal più recente, con i totali di oggi, della settimana, del mese e dell'anno e la media al giorno degli ultimi 30 giorni. Si vedono i consumi di tutti insieme, di una persona sola o di un conto comune: sono visibili a chiunque abbia fatto l'accesso. Contano solo gli acquisti segnati nell'app (non il foglio cartaceo). Come nel saldo, l'acqua per la macchinetta conta sulla **Macchinetta del caffè** (si può scegliere in «Consumi di»), non su chi l'ha presa.
 - **Avviso del lunedì**: se il saldo è negativo, dal lunedì compare il riquadro rosso con tre pulsanti:
   - *Salda il debito*: apre «Pagamenti tra persone» già compilato con l'importo del debito e la Cassa;
   - *Compra il credito di un altro*: stesso modulo con l'importo, scegli tu la persona in credito (sono elencate nel riquadro);
   - *Compra uno dei beni*: apre «Ho comprato per il gruppo».
   Si può nascondere fino al lunedì successivo con «Ho capito».
-- **Profilo ed email**: la propria email per ricevere l'avviso anche per posta, e (facoltativi) **PayPal** e **IBAN** per dire come si vuole essere pagati. L'IBAN viene controllato: se c'è un errore di battitura non viene salvato.
+- **Profilo ed email**: la propria email per ricevere l'avviso anche per posta, e (facoltativi) **PayPal** e **IBAN** per dire come si vuole essere pagati. Come si imposta: vedi il passo 6 qui sopra.
 - **Scheda della persona**: toccando un nome in *Saldi di tutti* (o tra chi è in credito nell'avviso del lunedì) si apre la sua scheda con nome, cognome, saldo e come vuole essere pagato. In *Pagamenti tra persone* la scheda compare da sola appena si sceglie la persona. PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, e non finiscono nell'Excel.
 - **Lingua**: in alto a destra ci sono **IT / EN**. La scelta resta salvata per ogni persona (anche le email del lunedì arrivano nella sua lingua); al primo accesso l'app usa la lingua del telefono. Il cartello con il QR è in italiano e in inglese.
 - **Dopo ogni caffè** compare: «Ricorda di lasciare pulito dopo aver consumato il caffè!».

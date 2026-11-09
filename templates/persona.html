@@ -11,6 +11,6 @@
     <a class="btn" href="{{ url_for('paga', verso='dato', a=p.id) }}">💶 {{ _('Ho dato dei soldi a {nome}', nome=p|nome) }}</a>
   {% endif %}
 </section>
-{% if not p.speciale %}<p class="aiuto"><a href="{{ url_for('statistiche', persona=p.id) }}">📈 {{ _('Vedi i suoi consumi') }}</a></p>{% endif %}
+<p class="aiuto"><a href="{{ url_for('statistiche', persona=p.id) }}">📈 {{ _('Vedi i suoi consumi') }}</a></p>
 <p class="aiuto centro"><a href="{{ url_for('saldi') }}">← {{ _('Saldi di tutti') }}</a></p>
 {% endblock %}

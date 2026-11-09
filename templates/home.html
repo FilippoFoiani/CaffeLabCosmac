@@ -79,7 +79,7 @@
        data-emoji="{{ pr.emoji }}">
     <div class="prodotto-info">
       <div class="prodotto-nome"><span class="emoji">{{ pr.emoji }}</span>{{ _(pr.nome) }}</div>
-      <div class="piccolo">{{ pr.prezzo_cent|euro(false) }}{% if pr.addebito_id %} · {{ _('a carico del {conto}', conto=conti.get(pr.addebito_id, _('conto comune'))) }}{% endif %}</div>
+      <div class="piccolo">{{ pr.prezzo_cent|euro(false) }}{% if pr.addebito_id %} · {{ _('sul conto {conto}', conto=conti.get(pr.addebito_id, _('conto comune'))) }}{% endif %}</div>
     </div>
     <div class="stepper">
       <button type="button" class="step meno" aria-label="{{ _('Togli uno') }}: {{ _(pr.nome) }}">−</button>

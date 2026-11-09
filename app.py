@@ -41,7 +41,7 @@ PRODOTTI_DEFAULT = [
     {"codice": "caffe", "nome": "Caffè", "emoji": "☕", "prezzo": 30, "conto": None},
     {"codice": "acqua", "nome": "Acqua", "emoji": "💧", "prezzo": 25, "conto": None},
     {"codice": "acqua_macchinetta", "nome": "Acqua macchinetta", "emoji": "🫗",
-     "prezzo": 25, "conto": "Conto Caffè"},
+     "prezzo": 25, "conto": "Macchinetta del caffè"},
     {"codice": "bicchierino", "nome": "Bicchierino vuoto", "emoji": "🥤", "prezzo": 0, "conto": None},
 ]
 # Magazzino: la merce che si compra e si consuma (quantità e soglie si cambiano da Amministrazione)
@@ -289,6 +289,10 @@ def inizializza_db():
             for nome, giorni in MANUTENZIONI_ESEMPIO:
                 con.execute("INSERT INTO manutenzioni (nome, ogni_giorni, ultima_ts) VALUES (?,?,?)",
                             (nome, giorni, adesso()))
+        # Il conto comune «Conto Caffè» si chiama ora «Macchinetta del caffè» (una volta sola:
+        # dopo l'admin può rinominarlo come vuole)
+        if con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('rinomina_conto_caffe', '1')").rowcount:
+            con.execute("UPDATE persone SET nome='Macchinetta del caffè' WHERE nome='Conto Caffè' AND speciale=1")
         # Prodotti di partenza (una volta sola)
         for i, pr in enumerate(PRODOTTI_DEFAULT):
             if con.execute("SELECT 1 FROM prodotti WHERE codice=?", (pr["codice"],)).fetchone():
@@ -977,7 +981,7 @@ def acquista():
                            gruppo=gruppo, nota=nota, creato_da=u["id"])
             scala_magazzino(mid, pr["id"], q, u["id"])
             if chi != u["id"]:
-                a_carico_di_altri.append(_("{cosa} a carico del {conto}", cosa=nome_prodotto(pr),
+                a_carico_di_altri.append(_("{cosa} sul conto {conto}", cosa=nome_prodotto(pr),
                                            conto=nome_completo(persona(chi))))
     testo = ", ".join(etichetta_prodotto(pr, q) for pr, q in scelte)
     extra = f" ({'; '.join(a_carico_di_altri)})" if a_carico_di_altri else ""
@@ -1445,16 +1449,13 @@ QUANTI_PERIODI = {"giorno": 14, "settimana": 12, "mese": 12}   # gli anni: dal p
 
 
 def consumi(persona_id=None):
-    """[(giorno locale, prodotto_id, quantità)] degli acquisti non annullati, di tutti o di una persona.
-    Un prodotto pagato da un conto comune (es. acqua macchinetta) conta per chi l'ha preso."""
+    """[(giorno locale, prodotto_id, quantità)] degli acquisti non annullati, di tutti o di un conto.
+    Come nel saldo, un prodotto pagato da un conto comune (es. l'acqua macchinetta, pagata dalla
+    Macchinetta del caffè) conta su quel conto, non su chi l'ha preso."""
     righe = db().execute("""
-        SELECT ts, prodotto_id, qta FROM (
-            SELECT m.ts, m.prodotto_id, m.qta,
-                   CASE WHEN p.speciale = 1 AND m.nota LIKE 'presa da %' THEN m.creato_da
-                        ELSE m.persona_id END AS chi
-            FROM movimenti m JOIN persone p ON p.id = m.persona_id
-            WHERE m.tipo = 'acquisto' AND m.annullato = 0 AND m.qta > 0)
-        WHERE ? IS NULL OR chi = ?""", (persona_id, persona_id)).fetchall()
+        SELECT ts, prodotto_id, qta FROM movimenti
+        WHERE tipo = 'acquisto' AND annullato = 0 AND qta > 0 AND (? IS NULL OR persona_id = ?)""",
+                         (persona_id, persona_id)).fetchall()
     return [(da_iso(r["ts"]).astimezone(TZ).date(), r["prodotto_id"], r["qta"]) for r in righe]
 
 
@@ -1499,8 +1500,6 @@ def statistiche():
     periodo = request.args.get("periodo")
     periodo = periodo if periodo in PERIODI else "giorno"
     chi = persona(request.args.get("persona", type=int) or 0)
-    if chi and chi["speciale"]:
-        chi = None
     dati = consumi(chi["id"] if chi else None)
     oggi = datetime.now(TZ).date()
     quanti = QUANTI_PERIODI.get(periodo) or \
@@ -1532,7 +1531,12 @@ def statistiche():
         # il colore segue il prodotto (posizione fissa nell'elenco), non cambia con i filtri
         colori={pr["id"]: min(i, 7) for i, pr in enumerate(tutti_i_prodotti)},
         nomi_prodotti={pr["id"]: nome_prodotto(pr) for pr in tutti_i_prodotti},
-        persone=[p for p in elenco_saldi() if not p["speciale"]])
+        persone=[p for p in elenco_saldi() if not p["speciale"]],
+        # conti comuni che pagano qualche prodotto (es. Macchinetta del caffè per l'acqua macchinetta)
+        conti=db().execute("""SELECT * FROM persone WHERE speciale = 1 AND id IN
+                              (SELECT persona_id FROM movimenti WHERE tipo = 'acquisto'
+                               UNION SELECT addebito_id FROM prodotti WHERE addebito_id IS NOT NULL)
+                              ORDER BY LOWER(nome)""").fetchall())
 
 
 # --------------------------------------------------------------------------

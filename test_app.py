@@ -95,7 +95,7 @@ def test_import_saldi():
     assert saldo_di("Giulio") == -949 + 1729
     assert saldo_di("Cassa") == 300
     assert saldo_di("Gianluca") == 0
-    assert saldo_di("Conto Caffè") == 0
+    assert saldo_di("Macchinetta del caffè") == 0
 
 
 def test_serve_login():
@@ -120,18 +120,18 @@ def test_acquisto_multiplo_e_annulla():
             f"q{prod('acqua')}": 1, f"q{prod('acqua_macchinetta')}": 1}
     r = c.post("/acquista", data=dati, follow_redirects=True)
     assert "Caffè × 2" in r.get_data(as_text=True)
-    # caffè e acqua a carico di Agnese, l'acqua per la macchinetta sul Conto Caffè
+    # caffè e acqua a carico di Agnese, l'acqua per la macchinetta sulla Macchinetta del caffè
     assert saldo_di("Agnese") == 716 - 60 - 25
-    assert saldo_di("Conto Caffè") == -25
+    assert saldo_di("Macchinetta del caffè") == -25
     # stesso modulo inviato due volte: non deve contare doppio
     c.post("/acquista", data=dati)
     assert saldo_di("Agnese") == 716 - 85
-    # annulla: si annulla tutto l'acquisto, anche la parte sul Conto Caffè
+    # annulla: si annulla tutto l'acquisto, anche la parte sulla Macchinetta del caffè
     home = c.get("/").get_data(as_text=True)
     mid = re.search(r'action="/annulla/(\d+)"', home).group(1)
     c.post(f"/annulla/{mid}", data={"_csrf": tok})
     assert saldo_di("Agnese") == 716
-    assert saldo_di("Conto Caffè") == 0
+    assert saldo_di("Macchinetta del caffè") == 0
 
 
 def test_acquisto_vuoto_rifiutato():
@@ -337,7 +337,7 @@ def test_limite_di_debito():
         c.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prod('caffe')}": 1,
                                   "oltre_limite": "1"})
         assert saldo_di("Lupi") == partenza - caffe          # bloccato
-        # l'acqua per la macchinetta la paga il Conto Caffè: non è bloccata
+        # l'acqua per la macchinetta la paga la Macchinetta del caffè: non è bloccata
         tok, html = csrf(c, "/")
         r = c.post("/acquista", data={"_csrf": tok, "nonce": nonce(html),
                                       f"q{prod('acqua_macchinetta')}": 1}, follow_redirects=True)
@@ -755,7 +755,7 @@ def test_statistiche_dei_consumi():
     luca = app.test_client()
     entra(luca, "Luca")
     lid, caffe, acqua_m = id_di("Luca"), prod("caffe"), prod("acqua_macchinetta")
-    # dalla home: 1 caffè (pagato da Luca) e 1 acqua macchinetta (pagata dal Conto Caffè)
+    # dalla home: 1 caffè (pagato da Luca) e 1 acqua macchinetta (pagata dalla Macchinetta del caffè)
     tok, html = csrf(luca, "/")
     luca.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{caffe}": "1", f"q{acqua_m}": "1"})
     # caffè di altri giorni, scritti direttamente con la data; uno annullato non conta
@@ -771,9 +771,11 @@ def test_statistiche_dei_consumi():
         modulo.db().commit()
         dati = modulo.consumi(lid)
         assert sorted(q for _g, p, q in dati if p == caffe) == [1, 2, 3, 4]
-        assert [q for _g, p, q in dati if p == acqua_m] == [1]      # conta per Luca, non per il conto
+        # come nel saldo, l'acqua macchinetta conta sulla Macchinetta del caffè, non su Luca
+        assert all(p != acqua_m for _g, p, _q in dati)
         conto = modulo.db().execute("SELECT addebito_id FROM prodotti WHERE id=?", (acqua_m,)).fetchone()[0]
-        assert all(p != acqua_m for _g, p, _q in modulo.consumi(conto))
+        assert any(p == acqua_m for _g, p, _q in modulo.consumi(conto))
+        assert modulo.persona(conto)["nome"] == "Macchinetta del caffè"
     # periodi: inizio della settimana (lunedì), mese prima a cavallo d'anno
     assert modulo.inizio_periodo(date(2026, 11, 12), "settimana") == date(2026, 11, 9)
     assert modulo.periodo_prima(date(2026, 1, 1), "mese") == date(2025, 12, 1)
@@ -785,9 +787,21 @@ def test_statistiche_dei_consumi():
         assert pagina.count('class="stat-etichetta"') == righe
     pagina = nick.get(f"/statistiche?periodo=anno&persona={lid}").get_data(as_text=True)
     assert f">{adesso.year - 1}<" in pagina and f">{adesso.year}<" in pagina
-    assert "☕ 1 · 🫗 1" in re.sub(r"<[^>]+>", "", pagina)            # riquadro «Oggi»
+    oggi = re.sub(r"<[^>]+>|\s+", " ", re.search(r"Oggi</span>(.*?)</strong>", pagina, re.S).group(1)).strip()
+    assert oggi == "☕ 1"                                            # riquadro «Oggi»: niente acqua macchinetta
+    # il conto comune si può scegliere e mostra l'acqua macchinetta
+    pagina = nick.get(f"/statistiche?persona={conto}").get_data(as_text=True)
+    assert "Conti comuni" in pagina and "🫗" in re.search(r"Oggi</span>(.*?)</strong>", pagina, re.S).group(1)
     assert "Statistiche" in nick.get("/statistiche").get_data(as_text=True)
     assert app.test_client().get("/statistiche").status_code == 302
+    # un database vecchio con «Conto Caffè»: al riavvio diventa «Macchinetta del caffè», una volta sola
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET nome='Conto Caffè' WHERE id=?", (conto,))
+        modulo.db().execute("DELETE FROM impostazioni WHERE chiave='rinomina_conto_caffe'")
+        modulo.db().commit()
+    modulo.inizializza_db()
+    with app.app_context():
+        assert modulo.persona(conto)["nome"] == "Macchinetta del caffè"
 
 
 def test_magazzino():

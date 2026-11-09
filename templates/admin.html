@@ -127,7 +127,7 @@
 
 <section class="scheda">
   <h2>{{ _('Prodotti e prezzi') }}</h2>
-  <p class="aiuto">{{ _("Un nuovo prezzo vale solo per gli acquisti da ora in poi. Si può scegliere se paga chi lo prende oppure un conto comune (es. l'acqua per la macchinetta la paga il Conto Caffè).") }}</p>
+  <p class="aiuto">{{ _("Un nuovo prezzo vale solo per gli acquisti da ora in poi. Si può scegliere se paga chi lo prende oppure un conto comune (es. l'acqua per la macchinetta la paga la Macchinetta del caffè).") }}</p>
   {% for pr in prodotti %}
   <form method="post" action="{{ url_for('admin_prodotto', prid=pr.id) }}" class="modulo prodotto-admin{% if not pr.attivo %} spento{% endif %}">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
@@ -139,7 +139,7 @@
     </div>
     <select name="addebito_id" aria-label="{{ _('Chi paga') }}">
       <option value="">{{ _('Paga chi lo prende') }}</option>
-      {% for c in conti %}<option value="{{ c.id }}" {% if c.id == pr.addebito_id %}selected{% endif %}>{{ _('Paga il {conto}', conto=c|nome) }}</option>{% endfor %}
+      {% for c in conti %}<option value="{{ c.id }}" {% if c.id == pr.addebito_id %}selected{% endif %}>{{ _('Paga il conto {conto}', conto=c|nome) }}</option>{% endfor %}
     </select>
     <div class="riga-campi tra">
       <label class="spunta"><input type="checkbox" name="attivo" value="1" {% if pr.attivo %}checked{% endif %}> {{ _('Attivo (visibile a tutti)') }}</label>
@@ -158,7 +158,7 @@
       </div>
       <select name="addebito_id" aria-label="{{ _('Chi paga') }}">
         <option value="">{{ _('Paga chi lo prende') }}</option>
-        {% for c in conti %}<option value="{{ c.id }}">{{ _('Paga il {conto}', conto=c|nome) }}</option>{% endfor %}
+        {% for c in conti %}<option value="{{ c.id }}">{{ _('Paga il conto {conto}', conto=c|nome) }}</option>{% endfor %}
       </select>
       <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
     </form>

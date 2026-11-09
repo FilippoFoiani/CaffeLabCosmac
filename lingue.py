@@ -62,7 +62,7 @@ EN = {
     "Scegli con il +": "Choose with +",
     "a tuo carico": "you pay",
     "conto comune": "shared account",
-    "a carico del {conto}": "paid by {conto}",
+    "sul conto {conto}": "paid by {conto}",
     "Togli uno": "Remove one",
     "Aggiungi uno": "Add one",
     "Ultimo:": "Last:",
@@ -78,7 +78,7 @@ EN = {
     "annullato": "cancelled",
     "Puoi segnare al massimo {n} pezzi per prodotto.": "You can log at most {n} items per product.",
     "Scegli almeno un prodotto con il +.": "Choose at least one product with +.",
-    "{cosa} a carico del {conto}": "{cosa} paid by {conto}",
+    "{cosa} sul conto {conto}": "{cosa} paid by {conto}",
     "Segnato: {cosa}{extra}. Il tuo saldo: {saldo}": "Logged: {cosa}{extra}. Your balance: {saldo}",
     "Questo movimento non si può più annullare. Chiedi all'amministratore.":
         "This transaction can no longer be undone. Ask the administrator.",
@@ -145,13 +145,13 @@ EN = {
     "Email di prova a me": "Test email to me",
     "Invia adesso a tutti": "Send to everyone now",
     "Prodotti e prezzi": "Products and prices",
-    "Un nuovo prezzo vale solo per gli acquisti da ora in poi. Si può scegliere se paga chi lo prende oppure un conto comune (es. l'acqua per la macchinetta la paga il Conto Caffè).":
-        "A new price only applies to purchases from now on. You can choose whether the person who takes it pays, or a shared account (e.g. machine water is paid by the Coffee account).",
+    "Un nuovo prezzo vale solo per gli acquisti da ora in poi. Si può scegliere se paga chi lo prende oppure un conto comune (es. l'acqua per la macchinetta la paga la Macchinetta del caffè).":
+        "A new price only applies to purchases from now on. You can choose whether the person who takes it pays, or a shared account (e.g. machine water is paid by the Coffee machine account).",
     "Nome prodotto": "Product name",
     "Prezzo in euro": "Price in euro",
     "Chi paga": "Who pays",
     "Paga chi lo prende": "Paid by whoever takes it",
-    "Paga il {conto}": "Paid by {conto}",
+    "Paga il conto {conto}": "Paid by {conto}",
     "Attivo": "Active",
     "Attivo (visibile a tutti)": "Active (visible to everyone)",
     "Aggiungi un prodotto": "Add a product",
@@ -285,6 +285,8 @@ EN = {
     # --- statistiche ---
     "Statistiche": "Statistics",
     "Consumi di": "Consumption of",
+    "Conti comuni": "Shared accounts",
+    "Persone": "People",
     "Tutti": "Everyone",
     "tu": "you",
     "Mostra": "Show",
@@ -300,8 +302,8 @@ EN = {
     "Mesi": "Months",
     "Anni": "Years",
     "Ancora nessun consumo segnato nell'app.": "Nothing recorded in the app yet.",
-    "Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. L'acqua per la macchinetta conta per chi l'ha presa, anche se la paga il Conto Caffè.":
-        "Only purchases recorded in the app count, not those from the paper sheet. Water for the machine counts for whoever took it, even though the Coffee account pays for it.",
+    "Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. Come nel saldo, l'acqua per la macchinetta conta sulla Macchinetta del caffè, non su chi l'ha presa.":
+        "Only purchases recorded in the app count, not those from the paper sheet. As in the balances, water for the machine counts for the Coffee machine account, not for whoever took it.",
     "oggi": "today",
     "ieri": "yesterday",
     "questa settimana": "this week",

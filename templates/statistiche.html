@@ -14,9 +14,14 @@
   <label for="persona">{{ _('Consumi di') }}</label>
   <select id="persona" name="persona" data-invia-subito>
     <option value="">{{ _('Tutti') }}</option>
+    {% if conti %}<optgroup label="{{ _('Conti comuni') }}">
+      {% for p in conti %}<option value="{{ p.id }}" {% if chi and chi.id == p.id %}selected{% endif %}>{{ p|nome }}</option>{% endfor %}
+    </optgroup>{% endif %}
+    <optgroup label="{{ _('Persone') }}">
     {% for p in persone %}
     <option value="{{ p.id }}" {% if chi and chi.id == p.id %}selected{% endif %}>{{ p|nome }}{% if p.id == utente.id %} ({{ _('tu') }}){% endif %}</option>
     {% endfor %}
+    </optgroup>
   </select>
   <noscript><button type="submit" class="btn">{{ _('Mostra') }}</button></noscript>
 </form>
@@ -58,7 +63,7 @@
   {% endfor %}
 </ul>
 {% endif %}
-<p class="aiuto">{{ _("Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. L'acqua per la macchinetta conta per chi l'ha presa, anche se la paga il Conto Caffè.") }}</p>
+<p class="aiuto">{{ _("Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. Come nel saldo, l'acqua per la macchinetta conta sulla Macchinetta del caffè, non su chi l'ha presa.") }}</p>
 <p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}
 
