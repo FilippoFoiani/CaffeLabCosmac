@@ -8,7 +8,7 @@ Caffè Lab: a small Flask + SQLite web app that replaces a paper tally sheet for
 
 Deployed on PythonAnywhere's free plan (no scheduled tasks; WSGI imports `from app import app as application`). Updates are shipped as a zip that overwrites the code but never `dati/`. `GUIDA.md` is the user-facing install/upgrade guide; update it when behavior that admins or users see changes.
 
-For every user-visible change, also add an entry at the **top** of `NOVITA` in `novita.py`, with a date id plus short `it` and `en` lines. Users see it once on the home page as "Novità dell'aggiornamento" until they tick "Ho letto". Build the deploy zip from the repo with `git -c core.autocrlf=false archive --format=zip --prefix=caffe-lab/ -o ../../caffe-lab_AAAA-MM-GG.zip HEAD`. The `caffe-lab/` prefix matters: the server's Bash steps unzip over `~/caffe-lab`. GitHub's "Download ZIP" uses the wrong folder name.
+For every user-visible change, also add an entry at the **top** of `NOVITA` in `novita.py`, with a date id plus short `it` and `en` lines. Users see it once on the home page as "Novità dell'aggiornamento" until they tick "Ho letto". Build the deploy zip from the repo with `git -c core.autocrlf=false archive --format=zip --prefix=caffe-lab/ -o ../../caffe-lab_AAAA-MM-GG.zip HEAD`. The `caffe-lab/` prefix matters: the server's Bash steps unzip over `~/caffe-lab`. GitHub's "Download ZIP" uses the wrong folder name. The manual workflow `.github/workflows/rilascio.yml` ("Zip per PythonAnywhere") does the same on GitHub: it runs the tests (reusing `test.yml` via `workflow_call`), then publishes a Release tagged with the date (`AAAA-MM-GG`, `AAAA-MM-GG_2`, …) with the zip attached and notes built from the `NOVITA` entries added since the previous release.
 
 ## Commands
 

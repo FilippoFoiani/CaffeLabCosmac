@@ -179,10 +179,13 @@ Per l'amministratore:
 - **Ogni mese**: il piano gratuito spegne la web app se non viene rinnovata. Entra nella scheda **Web** e premi il pulsante per estenderla (*Run until 1 month from today*). Conviene mettersi un promemoria.
 - **Backup**: arriva da solo ogni lunedì per email agli amministratori (vedi sopra). Conserva quelle email, magari in una cartella apposta. In qualsiasi momento puoi anche scaricarlo da *Amministrazione → Backup*.
 - **Aggiornare l'app** (nuova versione dello zip) senza perdere niente: persone, saldi e movimenti stanno solo in `dati/`, che lo zip non contiene mai.
-  1. **Prepara lo zip** sul PC, dalla cartella della repository (dopo il commit):
-     `git -c core.autocrlf=false archive --format=zip --prefix=caffe-lab/ -o ../caffe-lab_AAAA-MM-GG.zip HEAD`.
-     Non usare «Download ZIP» di GitHub: dentro la cartella si chiamerebbe `CaffeLabCosmac-main` e sul server resterebbe la versione vecchia.
-     Se l'aggiornamento cambia qualcosa che si vede, prima aggiungi due righe in cima a `novita.py`: compaiono a tutti nel riquadro «Novità dell'aggiornamento».
+  1. **Prepara lo zip**, in uno di questi due modi:
+     - **Da GitHub (consigliato).** Prima fai il push delle modifiche. Poi sul repository: scheda **Actions** → a sinistra **Zip per PythonAnywhere** → **Run workflow** (branch `main`; le note sono facoltative) → **Run workflow**. In un paio di minuti esegue i test e, solo se passano tutti, crea una **Release** con lo zip `caffe-lab_AAAA-MM-GG.zip`. La trovi nella pagina **Releases** del repository (colonna a destra della pagina principale): scarica lo zip da *Assets*. Le versioni vecchie restano lì: se un aggiornamento dà problemi, ricarica lo zip della release precedente.
+     - **Dal PC**, dalla cartella della repository (dopo il commit):
+       `git -c core.autocrlf=false archive --format=zip --prefix=caffe-lab/ -o ../caffe-lab_AAAA-MM-GG.zip HEAD`.
+
+     Non usare «Download ZIP» di GitHub: dentro la cartella si chiamerebbe `CaffeLabCosmac-main` e sul server resterebbe la versione vecchia. Va bene invece lo zip in *Assets* della release, non i «Source code» accanto.
+     Se l'aggiornamento cambia qualcosa che si vede, prima aggiungi due righe in cima a `novita.py`: compaiono a tutti nel riquadro «Novità dell'aggiornamento» (e nelle note della release).
   2. scheda **Files** → carica lo zip nella cartella principale;
   3. **Consoles → Bash**, un comando alla volta (backup del database, scompatta lo zip più recente sopra il codice, riavvia):
      ```bash

@@ -1,0 +1,99 @@
+# Crea lo zip da caricare su PythonAnywhere e lo pubblica in una Release.
+# Si lancia a mano: Actions → «Zip per PythonAnywhere» → Run workflow (branch main).
+# Prima esegue tutti i test: se uno fallisce, lo zip non viene creato.
+name: Zip per PythonAnywhere
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "Note da aggiungere alla release (facoltative)"
+        required: false
+        default: ""
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  zip:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # serve per creare il tag e la release
+    steps:
+      - name: Solo dal branch main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Lancia questa Action dal branch main (ora è ${GITHUB_REF_NAME})."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # serve tutta la storia per trovare la release precedente
+
+      - name: Scegli il nome (data di oggi, ora italiana)
+        id: nome
+        run: |
+          data=$(TZ=Europe/Rome date +%Y-%m-%d)
+          tag=$data; n=2
+          while git rev-parse -q --verify "refs/tags/$tag" >/dev/null; do   # più rilasci lo stesso giorno
+            tag="${data}_$n"; n=$((n+1))
+          done
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "zip=caffe-lab_$tag.zip" >> "$GITHUB_OUTPUT"
+          echo "precedente=$(git tag --list '20*' --sort=-creatordate | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Crea lo zip
+        # stesso comando della GUIDA: la cartella dentro lo zip deve chiamarsi caffe-lab/
+        run: git archive --format=zip --prefix=caffe-lab/ -o "${{ steps.nome.outputs.zip }}" HEAD
+
+      - name: Controlla lo zip
+        run: |
+          unzip -l "${{ steps.nome.outputs.zip }}" | tee elenco.txt
+          grep -q " caffe-lab/app.py$" elenco.txt || { echo "::error::manca caffe-lab/app.py"; exit 1; }
+          if grep -q " caffe-lab/dati/" elenco.txt; then echo "::error::lo zip contiene dati/"; exit 1; fi
+
+      - name: Scrivi le note della release
+        env:
+          PRECEDENTE: ${{ steps.nome.outputs.precedente }}
+          NOTE: ${{ inputs.note }}
+          ZIP: ${{ steps.nome.outputs.zip }}
+        run: |
+          python3 - <<'PY' > note.md
+          import os, subprocess
+          ns = {}
+          exec(open("novita.py", encoding="utf-8").read(), ns)
+          gia = set()
+          prec = os.environ["PRECEDENTE"]
+          if prec:   # le novità già presenti nella release precedente non si ripetono
+              vecchio = {}
+              exec(subprocess.run(["git", "show", f"{prec}:novita.py"], capture_output=True,
+                                  text=True, check=True).stdout, vecchio)
+              gia = {v["id"] for v in vecchio["NOVITA"]}
+          nuove = [v for v in ns["NOVITA"] if v["id"] not in gia]
+          if os.environ["NOTE"].strip():
+              print(os.environ["NOTE"].strip() + "\n")
+          print("## Novità\n")
+          for v in nuove:
+              for riga in v["it"]:
+                  print(f"- {riga}")
+          if not nuove:
+              print("- Nessuna novità visibile agli utenti.")
+          zip_ = os.environ["ZIP"]
+          print(f"""
+          ## Come installarla
+
+          1. Scarica `{zip_}` qui sotto, in *Assets*.
+          2. PythonAnywhere → **Files** → carica lo zip nella cartella principale.
+          3. **Consoles → Bash**: segui i comandi di `GUIDA.md`, sezione *Manutenzione → Aggiornare l'app*.
+          """)
+          PY
+          cat note.md
+
+      - name: Pubblica la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.nome.outputs.tag }}" "${{ steps.nome.outputs.zip }}" \
+            --target "$GITHUB_SHA" --title "Caffè Lab ${{ steps.nome.outputs.tag }}" \
+            --notes-file note.md --generate-notes

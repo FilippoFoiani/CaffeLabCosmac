@@ -5,6 +5,7 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:        # la usa anche rilascio.yml, prima di creare lo zip
 
 jobs:
   test:
