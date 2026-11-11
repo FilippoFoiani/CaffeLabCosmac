@@ -15,7 +15,7 @@ For every user-visible change, also add an entry at the **top** of `NOVITA` in `
 ```bash
 pip install -r requirements.txt          # Flask, openpyxl, segno (QR), tzdata
 python3 app.py                           # dev server on http://localhost:5000; creates admin "root", PIN 0000 (CAFFE_ROOT_PIN / CAFFE_ROOT=0)
-python3 -m pytest -q                     # all tests (needs pytest and Pillow, which are not in requirements.txt)
+python3 -m pytest -q                     # all tests (pytest is not in requirements.txt)
 python3 -m pytest -q test_app.py::test_spesa   # a single test
 python3 gestione.py                      # console admin commands: importa | elenco | admin <id> | reset-pin <id> | avvisi
 ```
@@ -32,7 +32,7 @@ Nearly everything is in **`app.py`**, a single module: config, schema, helpers, 
 
 **Shared accounts.** `persone.speciale=1` marks shared accounts (Cassa, Acqua, Macchinetta del caffè, formerly "Conto Caffè") that cannot log in. A product with `addebito_id` set charges that account instead of the buyer, and statistics count it on that account too, as the balances do.
 
-**Approval flow.** Group expenses (`spesa`) and payments to someone else go into `richieste` with `stato='attesa'`. Ledger rows are written only when the request is approved (`decidi_richiesta`; `puo_decidere` decides who may approve). First logins and new registrations are also held (`persone.approvato=0`, which makes `g.in_attesa` and redirects to `/attesa`) until an admin approves. Decisions are logged in `registro_accessi`.
+**Approval flow.** Group expenses (`spesa`, admins' included) and payments to someone else go into `richieste` with `stato='attesa'`. Ledger rows are written only when the request is approved (`decidi_richiesta`; `puo_decidere` decides who may approve: an admin's own expense needs another admin unless `unico_admin`). First logins and new registrations are also held (`persone.approvato=0`, which makes `g.in_attesa` and redirects to `/attesa`) until an admin approves. Decisions are logged in `registro_accessi`.
 
 **Schema migrations are automatic and additive.** `inizializza_db()` runs at import time. It applies `SCHEMA` (`CREATE TABLE IF NOT EXISTS`), adds missing columns with `ALTER TABLE` after checking `PRAGMA table_info`, and seeds defaults with `INSERT OR IGNORE` into `impostazioni`. Production databases are upgraded this way just by reloading. Add new columns there instead of editing existing `CREATE TABLE` statements, and never rename or drop columns.
 
@@ -46,7 +46,7 @@ Nearly everything is in **`app.py`**, a single module: config, schema, helpers, 
 
 **i18n.** Source strings are Italian and wrapped in `_("...")`, in both Python and templates. `lingue.EN` maps Italian text to English. Text missing from `EN` falls back to Italian. **`test_traduzioni_complete` fails if any `_("...")` literal in `app.py` or `templates/*.html` lacks an `EN` entry**, so add the translation whenever you add or change a string. Ledger `nota` values are stored in Italian, and `descrizione()` translates them at render time by matching known prefixes ("presa da ", "Spesa per il gruppo: ", …). Keep those prefixes stable.
 
-**Config** comes from environment variables: `CAFFE_DATA_DIR` (default `./dati`), `CAFFE_HTTPS`, `CAFFE_URL`, `CAFFE_SMTP_USER`/`CAFFE_SMTP_PASSWORD` (email is disabled when unset), `CAFFE_CRON_TOKEN`, `CAFFE_TZ`, `CAFFE_ORA_AVVISO`, `SECRET_KEY` (otherwise read from or generated into `dati/`). `dati/` holds `caffe.db`, the secret key and receipt photos (`scontrini/`). It is gitignored and must never be committed or deleted.
+**Config** comes from environment variables: `CAFFE_DATA_DIR` (default `./dati`), `CAFFE_HTTPS`, `CAFFE_URL`, `CAFFE_SMTP_USER`/`CAFFE_SMTP_PASSWORD` (email is disabled when unset), `CAFFE_CRON_TOKEN`, `CAFFE_TZ`, `CAFFE_ORA_AVVISO`, `SECRET_KEY` (otherwise read from or generated into `dati/`). `dati/` holds `caffe.db`, the secret key and, on older installs, receipt photos (`scontrini/`, a removed feature). It is gitignored and must never be committed or deleted.
 
 ## Tests
 

@@ -66,8 +66,6 @@ MAX_QTA_PER_VOLTA = 20             # per ciascun prodotto in un singolo acquisto
 MANUTENZIONI_ESEMPIO = [("Pulizia della macchinetta", 7), ("Decalcificazione", 30)]
 TESTO_PULIZIA = "Ricorda di lasciare pulito dopo aver consumato il caffè!"
 MAX_IMPORTO_CENT = 50000            # 500 €: oltre è quasi certamente un errore di battitura
-SCONTRINI_DIR = os.path.join(DATA_DIR, "scontrini")   # foto degli scontrini delle spese
-MAX_FOTO_BYTE = 12 * 1024 * 1024
 
 # Avviso del lunedì per chi ha il saldo negativo
 TESTO_AVVISO = "SALDA IL DEBITO, COMPRA IL CREDITO DI UN ALTRO UTENTE O COMPRA UNO DEI BENI"
@@ -96,7 +94,7 @@ def _chiave_segreta():
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.config.update(
-    MAX_CONTENT_LENGTH=MAX_FOTO_BYTE + 1024 * 1024,
+    MAX_CONTENT_LENGTH=1024 * 1024,                    # solo moduli, niente file da caricare
     SECRET_KEY=_chiave_segreta(),
     PERMANENT_SESSION_LIFETIME=timedelta(days=400),   # il telefono "si ricorda" di te
     SESSION_COOKIE_HTTPONLY=True,
@@ -1214,28 +1212,18 @@ def spesa():
             return pagina(request.form)
         if nonce_gia_usato(request.form.get("nonce")):
             return redirect(url_for("home"))
-        if g.utente["admin"]:
-            with db():
-                registra(g.utente["id"], "spesa", importo, nota=f"Spesa per il gruppo: {nota}",
-                         creato_da=g.utente["id"])
-                rid = db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, stato, "
-                                   "deciso_da, deciso_ts) VALUES (?, 'spesa', ?, ?, ?, 'approvata', ?, ?)",
-                                   (adesso(), g.utente["id"], importo, nota, g.utente["id"], adesso())).lastrowid
-                salva_articoli_spesa(rid, righe)
-                carica_magazzino(rid, g.utente["id"])
-            flash(_("Spesa registrata. Nuovo saldo: {saldo}", saldo=euro(saldo(g.utente['id']))), "ok")
-            return redirect(url_for("home"))
-        try:
-            foto = salva_scontrino(request.files.get("foto"))
-        except ValueError:
-            flash(_("La foto non è un'immagine valida o è troppo grande."), "errore")
-            return pagina(request.form)
+        # tutte le spese, anche quelle degli admin, aspettano l'approvazione di un admin
         with db():
-            rid = db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota, foto) "
-                               "VALUES (?, 'spesa', ?, ?, ?, ?)",
-                               (adesso(), g.utente["id"], importo, nota, foto)).lastrowid
+            rid = db().execute("INSERT INTO richieste (ts, tipo, richiedente_id, importo_cent, nota) "
+                               "VALUES (?, 'spesa', ?, ?, ?)",
+                               (adesso(), g.utente["id"], importo, nota)).lastrowid
             salva_articoli_spesa(rid, righe)
-        flash(_("Spesa inviata: l'importo ti verrà accreditato quando un amministratore la approva."), "ok")
+        if g.utente["admin"] and unico_admin(g.utente):
+            flash(_("Spesa inviata. Sei l'unico amministratore: approvala tu in «Richieste»."), "ok")
+        elif g.utente["admin"]:
+            flash(_("Spesa inviata: l'importo ti verrà accreditato quando un altro amministratore la approva."), "ok")
+        else:
+            flash(_("Spesa inviata: l'importo ti verrà accreditato quando un amministratore la approva."), "ok")
         return redirect(url_for("home"))
     return pagina({})
 
@@ -1306,45 +1294,27 @@ def registra_pagamento(da, a, importo, nota, gruppo=None):
              nota=f"Soldi ricevuti da {nome_completo(da)}{extra}", creato_da=da["id"])
 
 
-def salva_scontrino(file):
-    """Salva la foto dello scontrino (ridotta, se possibile). Ritorna il nome del file o ''."""
-    if not file or not file.filename:
-        return ""
-    dati = file.read(MAX_FOTO_BYTE + 1)
-    if not dati:
-        return ""
-    if len(dati) > MAX_FOTO_BYTE:
-        raise ValueError("troppo grande")
-    os.makedirs(SCONTRINI_DIR, exist_ok=True)
-    nome = f"{uuid.uuid4().hex}.jpg"
-    try:
-        from PIL import Image, ImageOps
-        img = ImageOps.exif_transpose(Image.open(io.BytesIO(dati)))
-        img.thumbnail((1600, 1600))
-        img.convert("RGB").save(os.path.join(SCONTRINI_DIR, nome), "JPEG", quality=80)
-    except ImportError:          # senza Pillow si salva così com'è
-        if not dati[:3] == b"\xff\xd8\xff" and not dati[:8] == b"\x89PNG\r\n\x1a\n":
-            raise ValueError("non è un'immagine")
-        with open(os.path.join(SCONTRINI_DIR, nome), "wb") as f:
-            f.write(dati)
-    except Exception:
-        raise ValueError("non è un'immagine")
-    return nome
-
-
 def richiesta_ferma(r):
     """True se la richiesta aspetta da più di ATTESA_MAX_PAGAMENTO."""
     return datetime.now(timezone.utc) - da_iso(r["ts"]) > ATTESA_MAX_PAGAMENTO
 
 
+def unico_admin(utente):
+    """True se «utente» è l'unico amministratore che può entrare nell'app."""
+    return not db().execute("SELECT 1 FROM persone WHERE admin=1 AND attivo=1 AND speciale=0 AND approvato=1 "
+                            "AND pin_hash IS NOT NULL AND id<>? LIMIT 1", (utente["id"],)).fetchone()
+
+
 def puo_decidere(r, utente):
     """Chi può approvare una richiesta.
-    Spesa: un admin. Pagamento: chi ha ricevuto i soldi; un admin solo se i soldi sono andati
+    Spesa: un admin, ma non la propria (a meno che sia l'unico admin). Pagamento: chi ha ricevuto i soldi; un admin solo se i soldi sono andati
     a un conto comune oppure se la richiesta è ferma da più di 3 giorni. Mai chi ha pagato."""
     if r["stato"] != "attesa":
         return False
     if r["tipo"] != "pagamento":
-        return bool(utente["admin"])
+        if not utente["admin"]:
+            return False
+        return r["richiedente_id"] != utente["id"] or unico_admin(utente)
     if r["controparte_id"] == utente["id"]:
         return True
     if not utente["admin"] or r["richiedente_id"] == utente["id"]:
@@ -1432,15 +1402,6 @@ def decidi_richiesta(rid, azione):
     flash(_("Approvata: {cosa}", cosa=descrivi_richiesta(r)) if azione == "approva"
           else _("Rifiutata: {cosa}", cosa=descrivi_richiesta(r)), "ok")
     return redirect(request.referrer or url_for("richieste"))
-
-
-@app.get("/scontrino/<int:rid>")
-@login_richiesto
-def scontrino(rid):
-    r = db().execute("SELECT * FROM richieste WHERE id=?", (rid,)).fetchone()
-    if not r or not r["foto"] or not (g.utente["admin"] or r["richiedente_id"] == g.utente["id"]):
-        abort(404)
-    return send_file(os.path.join(SCONTRINI_DIR, os.path.basename(r["foto"])), mimetype="image/jpeg")
 
 
 @app.post("/admin/accesso/<int:pid>/<azione>")

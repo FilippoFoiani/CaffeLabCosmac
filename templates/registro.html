@@ -46,13 +46,13 @@
         <div class="piccolo">
           {{ esito(r.stato) }}
           {% if r.stato != 'annullata' %}·
-            {% if r.deciso_da == r.richiedente_id %}{{ _("registrata direttamente dall'admin {nome}", nome=nomi.get(r.deciso_da, '?')) }}
+            {% if r.deciso_da == r.richiedente_id and r.tipo == 'spesa' %}{{ _("da {nome}, l'admin che l'ha registrata", nome=nomi.get(r.deciso_da, '?')) }}
+            {% elif r.deciso_da == r.richiedente_id %}{{ _("registrata direttamente dall'admin {nome}", nome=nomi.get(r.deciso_da, '?')) }}
             {% elif r.deciso_da == r.controparte_id %}{{ _('da {nome}, che ha ricevuto i soldi', nome=nomi.get(r.deciso_da, '?')) }}
             {% else %}{{ _('da {nome}', nome=nomi.get(r.deciso_da, '?')) }}{% if r.deciso_da in admin_ids %} (admin){% endif %}{% endif %}
           {% endif %}
           · {{ (r.deciso_ts or r.ts)|ora }}
           {% if r.deciso_ts and r.deciso_ts[:10] != r.ts[:10] %} · {{ _('richiesta del {data}', data=r.ts|ora) }}{% endif %}
-          {% if r.foto %} · <a href="{{ url_for('scontrino', rid=r.id) }}" target="_blank">🧾 {{ _('scontrino') }}</a>{% endif %}
         </div>
       </div>
       <div class="importo">{{ r.importo_cent|euro(false) }}</div>

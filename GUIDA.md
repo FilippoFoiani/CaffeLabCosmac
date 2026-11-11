@@ -145,7 +145,7 @@ PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda: si 
 - **Pagamenti tra persone**:
   - *Ho dato dei soldi a qualcuno*: se dai 5 € a chi è in credito, il tuo saldo sale di 5 € e il suo scende di 5 €. **Conta solo quando chi ha ricevuto i soldi conferma** dalla pagina *Richieste* (per la Cassa conferma un amministratore). Vale anche quando paga un amministratore: nessuno può confermare un proprio pagamento.
   - *Mi prendo il debito di qualcuno*: ti accolli una parte del debito di un altro (come Massi con Martin sul foglio). Vale subito, perché pesa solo su di te.
-- **Ho comprato per il gruppo**: chi compra caffè o cialde registra la spesa, anche con la foto dello scontrino. **Il credito arriva quando un amministratore la approva.** Per la merce del magazzino (cialde, bottiglie, bicchierini) bisogna scrivere **quanti pezzi** e quanto sono costati; tutto il resto va in *Altro* con descrizione e costo. Il totale lo calcola l'app.
+- **Ho comprato per il gruppo**: chi compra caffè o cialde registra la spesa. **Il credito arriva quando un amministratore la approva.** Vale anche per gli amministratori: la spesa di un admin la approva **un altro admin**; solo se nell'app c'è un unico amministratore, può approvarla lui stesso. Per la merce del magazzino (cialde, bottiglie, bicchierini) bisogna scrivere **quanti pezzi** e quanto sono costati; tutto il resto va in *Altro* con descrizione e costo. Il totale lo calcola l'app.
 - **Richieste**: qui ognuno conferma i pagamenti ricevuti e vede le proprie richieste in attesa (che può annullare). Gli amministratori vedono anche spese e nuovi accessi da approvare, e i pagamenti tra persone fermi da più di 3 giorni, che possono confermare al posto di chi doveva riceverli (tranne i propri); in cima alla pagina principale compare un avviso quando c'è qualcosa da fare.
 - **Come funziona**: pagina con le regole, come rientrare dal debito e le linee guida per la pulizia. Si apre anche senza aver fatto l'accesso: puoi mandarne il link a chi deve iniziare.
 - **Saldi di tutti**: visibili a tutti, con il pulsante per scaricare l'**Excel** (fogli *Saldi* e *Movimenti*).
@@ -166,7 +166,7 @@ Per l'amministratore:
 
 - **Nuovi accessi**: il primo accesso di ogni persona (e ogni nuova registrazione) resta in attesa finché un amministratore non lo approva da *Richieste*. Se qualcuno attiva l'account di un altro, rifiutalo: l'account torna libero per il vero proprietario. Chi era già entrato prima di questo aggiornamento resta attivo.
 - **Comunicazioni a tutti** (*Amministrazione*, in alto): scrivi il testo e premi **Pubblica**. Compare in home a tutti come notifica finché ognuno non spunta *Ho letto*; nell'elenco vedi da quante persone è stata letta. Con **Ritira** sparisce per tutti.
-- **Registro approvazioni** (*Amministrazione → Registro approvazioni*, solo admin): per ogni accesso, spesa e pagamento approvato, rifiutato o annullato mostra chi l'ha chiesto, chi ha deciso e quando, con lo scontrino se c'è. Lo storico completo è anche nel foglio *Approvazioni* dell'Excel, che compare solo quando lo scarica un admin. Le spese di un admin e i suoi versamenti ai conti comuni (che valgono subito) compaiono come "registrata direttamente dall'admin". Gli accessi approvati prima di questo aggiornamento non sono nel registro.
+- **Registro approvazioni** (*Amministrazione → Registro approvazioni*, solo admin): per ogni accesso, spesa e pagamento approvato, rifiutato o annullato mostra chi l'ha chiesto, chi ha deciso e quando. Lo storico completo è anche nel foglio *Approvazioni* dell'Excel, che compare solo quando lo scarica un admin. I versamenti di un admin ai conti comuni (che valgono subito) compaiono come "registrata direttamente dall'admin"; le spese approvate da chi le aveva registrate (unico admin, o spese di prima di questo aggiornamento) come "l'admin che l'ha registrata". Gli accessi approvati prima di questo aggiornamento non sono nel registro.
 - **Limite di debito**: in *Amministrazione* scegli l'importo (0 = nessun limite) e cosa succede oltre il limite: *avvisa e chiedi conferma* (consigliato) oppure *blocca gli acquisti*. Chi è oltre il limite vede un avviso rosso fisso.
 - **Magazzino** (*Amministrazione → Magazzino*): per ogni articolo (cialde, bottiglie, bicchierini, e altri che puoi aggiungere) la quantità scende da sola a ogni acquisto e sale quando approvi una spesa con la merce. Ogni caffè scala 1 cialda e 1 bicchierino, ogni acqua (anche quella per la macchinetta) 1 bottiglia, ogni bicchierino vuoto 1 bicchierino: si cambia nella tabella *Cosa consuma ogni prodotto*. Quando conti i pezzi veri scrivili in *Pezzi contati*: la differenza resta nel registro. Quando un articolo arriva alla **soglia**, gli amministratori e chi è in debito vedono in home il riquadro «Sta finendo la merce» con il pulsante per registrare l'acquisto. Finché un articolo non è stato contato almeno una volta l'avviso non compare.
 - **Bilancio** (*Amministrazione → Bilancio*, solo admin): per ogni articolo mette in fila, in pezzi e in euro, *iniziale (prima conta) + comprati − consumati ± differenze delle conte = in magazzino*. Gli euro sono al **costo medio** di un pezzo nelle spese approvate (finché non c'è una spesa con quell'articolo il costo è «—»). Le **differenze delle conte** sono i pezzi spariti tra il calcolo dell'app e la conta vera: di solito caffè non segnati. Per ogni prodotto mostra quanto ha incassato, quanto è costata la sua merce e il margine, anche per pezzo (prezzo − costo della ricetta): se il margine è negativo il prezzo non copre i costi.
@@ -215,8 +215,6 @@ touch /var/www/*_wsgi.py && echo "OK: ripristinato"
 4. Apri l'app: saldi, movimenti, persone, PIN e amministratori sono come al momento del backup. Se l'account è nuovo, ognuno rientra una volta con nome e PIN.
 5. Se l'indirizzo è cambiato (nuovo nome utente), aggiorna `CAFFE_URL` nel file WSGI e ristampa il QR.
 
-Le foto degli scontrini non sono nel backup: restano solo su PythonAnywhere.
-
 ## Provarla sul proprio PC (facoltativo)
 
 ```bash
@@ -225,6 +223,6 @@ python3 gestione.py importa saldi_iniziali.csv
 python3 app.py
 ```
 
-Poi apri http://localhost:5000. Per i test automatici: `pip install pytest Pillow` e `python3 -m pytest -q`.
+Poi apri http://localhost:5000. Per i test automatici: `pip install pytest` e `python3 -m pytest -q`.
 
 Per non dover attivare un account e farlo approvare, `python3 app.py` crea da solo l'utente **root**, amministratore già approvato, con PIN **0000**: sceglilo nell'elenco di *Accedi*. Per un altro PIN: `CAFFE_ROOT_PIN=1234 python3 app.py`; per non crearlo: `CAFFE_ROOT=0 python3 app.py`. Sul server l'app parte dal file WSGI e root non viene mai creato. Però, se l'hai creato sul PC, **non caricare quel `caffe.db` sul server**: root resterebbe amministratore con PIN 0000.

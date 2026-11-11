@@ -269,9 +269,7 @@ EN = {
     "es. 2 kg di caffè": "e.g. 2 kg of coffee",
     "Quanto hai speso (€)": "How much you spent (€)",
     "es. 18,90": "e.g. 18.90",
-    "Registra la spesa": "Save the purchase",
     "Inserisci l'importo e cosa hai comprato.": "Enter the amount and what you bought.",
-    "Spesa registrata. Nuovo saldo: {saldo}": "Purchase saved. New balance: {saldo}",
     "Profilo": "Profile",
     "Mandami per email l'avviso del lunedì quando il mio saldo è negativo":
         "Email me the Monday reminder when my balance is negative",
@@ -559,8 +557,8 @@ EN = {
         "put the money in the cash box and record it in “Payments between people” → “I gave money to someone” → Cash box. It counts once an administrator confirms.",
     "dai i soldi a chi è in credito (lo vedi in «Saldi di tutti»: tocca il suo nome per vedere il suo PayPal o IBAN) e registralo allo stesso modo, scegliendo quella persona. Conta quando lei conferma di averli ricevuti.":
         "give the money to someone in credit (see “Everyone's balances”: tap their name to see their PayPal or IBAN) and record it the same way, choosing that person. It counts once they confirm they received it.",
-    "compra caffè, cialde, bottiglie, bicchierini o altro per il gruppo e registralo in «Ho comprato per il gruppo», con la foto dello scontrino. Per cialde, bottiglie e bicchierini scrivi quanti pezzi e quanto li hai pagati. Il credito arriva quando un amministratore approva.":
-        "buy coffee, pods, bottles, cups or anything else for the group and record it in “I bought for the group”, with a photo of the receipt. For pods, bottles and cups enter how many pieces and how much you paid. The credit arrives once an administrator approves.",
+    "compra caffè, cialde, bottiglie, bicchierini o altro per il gruppo e registralo in «Ho comprato per il gruppo». Per cialde, bottiglie e bicchierini scrivi quanti pezzi e quanto li hai pagati. Il credito arriva quando un amministratore approva.":
+        "buy coffee, pods, bottles, cups or anything else for the group and record it in “I bought for the group”. For pods, bottles and cups enter how many pieces and how much you paid. The credit arrives once an administrator approves.",
     # --- come funziona: il profilo ---
     "Imposta il tuo profilo (fallo subito)": "Set up your profile (do it now)",
     "Nella pagina principale tocca «👤 Profilo ed email».": "On the home page tap “👤 Profile and email”.",
@@ -683,8 +681,6 @@ EN = {
         "waiting for {nome}",
     "ferma da più di 3 giorni":
         "pending for more than 3 days",
-    "scontrino":
-        "receipt",
     "Conferma solo se hai davvero ricevuto i soldi: il tuo saldo scenderà di {importo}.":
         "Only confirm if you really received the money: your balance will go down by {importo}.",
     "Rifiutare questa richiesta?":
@@ -697,10 +693,15 @@ EN = {
         "waiting for an administrator's OK",
     "aspetta la conferma di {nome}":
         "waiting for {nome} to confirm",
-    "Il credito arriva quando un amministratore approva la spesa: allega la foto dello scontrino per fare prima.":
-        "The credit arrives once an administrator approves the purchase: attach a photo of the receipt to speed things up.",
-    "Foto dello scontrino (facoltativa)":
-        "Photo of the receipt (optional)",
+    "Il credito arriva quando un amministratore approva la spesa. Le spese di un amministratore le approva un altro amministratore.":
+        "The credit arrives once an administrator approves the purchase. An administrator's purchases are approved by another administrator.",
+    "Spesa inviata. Sei l'unico amministratore: approvala tu in «Richieste».":
+        "Purchase sent. You are the only administrator: approve it yourself in “Requests”.",
+    "Spesa inviata: l'importo ti verrà accreditato quando un altro amministratore la approva.":
+        "Purchase sent: the amount will be credited to you once another administrator approves it.",
+    "è una tua spesa: puoi approvarla perché sei l'unico amministratore":
+        "it's your own purchase: you can approve it because you are the only administrator",
+    "da {nome}, l'admin che l'ha registrata": "by {nome}, the admin who recorded it",
     "Invia per approvazione":
         "Send for approval",
     "Il tuo accesso è stato approvato: benvenuto!":
@@ -713,8 +714,6 @@ EN = {
         "Payment sent: it will count once an administrator confirms they received the money.",
     "Pagamento inviato: conterà quando {nome} confermerà di aver ricevuto i soldi.":
         "Payment sent: it will count once {nome} confirms they received the money.",
-    "La foto non è un'immagine valida o è troppo grande.":
-        "The photo isn't a valid image or is too large.",
     "Spesa inviata: l'importo ti verrà accreditato quando un amministratore la approva.":
         "Purchase sent: the amount will be credited to you once an administrator approves it.",
     "{nome} ha comprato per il gruppo: {cosa}":

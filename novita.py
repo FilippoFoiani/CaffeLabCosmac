@@ -9,6 +9,17 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-11b",
+        "it": [
+            "🛒 Anche le spese per il gruppo degli amministratori ora vanno approvate, da un altro amministratore.",
+            "🧾 Tolta la foto dello scontrino dalla spesa.",
+        ],
+        "en": [
+            "🛒 Purchases for the group made by administrators now need approval too, by another administrator.",
+            "🧾 The receipt photo has been removed from purchases.",
+        ],
+    },
+    {
         "id": "2026-11-11",
         "it": [
             "🧪 Per gli amministratori: in «Amministrazione → Avviso del lunedì» c'è la prova a secco, che mostra chi riceverebbe l'email e con quale testo, senza spedire nulla.",

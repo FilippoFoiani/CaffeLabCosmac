@@ -194,19 +194,14 @@ def test_spesa():
     c = app.test_client()
     entra(c, "Giacomo")
     tok, html = csrf(c, "/spesa")
-    # con la foto dello scontrino
-    from PIL import Image
-    foto = io.BytesIO()
-    Image.new("RGB", (40, 30), "white").save(foto, "PNG")
-    foto.seek(0)
+    assert 'type="file"' not in html                  # niente più foto dello scontrino
     c.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), "importo": "18,90",
-                           "nota": "2 kg di caffè", "foto": (foto, "scontrino.png")},
-           content_type="multipart/form-data")
+                           "nota": "2 kg di caffè"})
     assert saldo_di("Giacomo") == 770                # in attesa: ancora niente credito
     rid = richiesta_in_attesa("spesa")
     tok, _ = csrf(c, "/")
     assert c.post(f"/richieste/{rid}/approva", data={"_csrf": tok}).status_code == 403
-    assert c.get(f"/scontrino/{rid}").status_code == 200       # chi l'ha inviata vede lo scontrino
+    assert c.get(f"/scontrino/{rid}").status_code == 404
     admin = entra_come_admin()
     toka, _ = csrf(admin, "/richieste")
     assert "2 kg di caffè" in admin.get("/richieste").get_data(as_text=True)
@@ -925,10 +920,13 @@ def test_magazzino():
     admin.post(f"/richieste/{rid}/approva", data={"_csrf": toka})
     assert giacenze()["bottiglie"] == 8 and saldo_di("Max") == saldo_prima + 450
     assert "Sta finendo la merce" not in max_.get("/").get_data(as_text=True)
-    # la spesa di un admin entra subito; il registro e la pagina li vede solo l'admin
+    # anche la spesa di un admin aspetta l'approvazione (qui è l'unico admin: la approva lui);
+    # il registro e la pagina li vede solo l'admin
     tok, html = csrf(admin, "/spesa")
     admin.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"qta_{ids['cialde']}": "50",
                                f"costo_{ids['cialde']}": "10"})
+    assert giacenze()["cialde"] == 10
+    admin.post(f"/richieste/{richiesta_in_attesa('spesa')}/approva", data={"_csrf": toka})
     assert giacenze()["cialde"] == 60
     pagina = admin.get("/admin/magazzino").get_data(as_text=True)
     assert "Registro del magazzino" in pagina and "+50" in pagina
@@ -960,6 +958,7 @@ def test_bilancio_magazzino():
     conta(10)                                                      # quantità di partenza
     tok, html = csrf(admin, "/spesa")                              # 20 pezzi per 4 € = 0,20 € l'uno
     admin.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), f"qta_{aid}": "20", f"costo_{aid}": "4"})
+    admin.post(f"/richieste/{richiesta_in_attesa('spesa')}/approva", data={"_csrf": toka})  # unico admin
     max_ = app.test_client()
     entra(max_, "Max")
     for qta in (5, 1):
@@ -1063,3 +1062,40 @@ def test_utente_root_per_le_prove_in_locale():
     r = c.post("/accedi", data={"_csrf": tok, "persona_id": pid, "pin": "4321"})
     assert r.status_code == 302 and r.headers["Location"].endswith("/")   # niente attesa di approvazione
     assert c.get("/admin").status_code == 200
+
+
+def test_spesa_di_un_admin_la_approva_un_altro_admin():
+    """Anche le spese degli admin aspettano l'approvazione: di un altro admin se c'è,
+    altrimenti (unico admin) può approvarla chi l'ha registrata."""
+    admin = entra_come_admin()                                     # Filippo
+    with app.app_context():                                        # root (test precedente) non conta qui
+        modulo.db().execute("UPDATE persone SET admin=0 WHERE nome='root'")
+        modulo.db().commit()
+    prima = saldo_di("Filippo")
+    tok, html = csrf(admin, "/spesa")
+    assert "Invia per approvazione" in html
+    r = admin.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), "importo": "6", "nota": "latte"},
+                   follow_redirects=True)
+    assert "Sei l'unico amministratore" in r.get_data(as_text=True).replace("&#39;", "'")
+    assert saldo_di("Filippo") == prima                            # non vale ancora
+    rid = richiesta_in_attesa("spesa")
+    # con un secondo admin, Filippo non può più approvare la propria spesa
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET admin=1 WHERE id=?", (id_di("Massi"),))
+        modulo.db().commit()
+    try:
+        altro = app.test_client()
+        entra(altro, "Massi")
+        assert admin.post(f"/richieste/{rid}/approva", data={"_csrf": tok}).status_code == 403
+        assert "latte" not in admin.get("/richieste").get_data(as_text=True).split("Le mie richieste in attesa")[0]
+        tokm, html = csrf(altro, "/richieste")
+        assert "latte" in html
+        altro.post(f"/richieste/{rid}/approva", data={"_csrf": tokm})
+        assert saldo_di("Filippo") == prima + 600
+        registro = altro.get("/admin/registro?sezione=spese").get_data(as_text=True)
+        assert "latte" in registro
+    finally:
+        with app.app_context():
+            modulo.db().execute("UPDATE persone SET admin=0 WHERE id=?", (id_di("Massi"),))
+            modulo.db().execute("UPDATE persone SET admin=1 WHERE nome='root'")
+            modulo.db().commit()

@@ -3,8 +3,8 @@
 {% block contenuto %}
 <h1>{{ _('Ho comprato per il gruppo') }}</h1>
 <p class="aiuto">{{ _("Hai comprato caffè, cialde, zucchero o bicchierini per tutti? Registra la spesa: l'importo ti viene accreditato. La spesa è visibile a tutti nei movimenti.") }}</p>
-{% if not utente.admin %}<p class="aiuto">🔒 {{ _("Il credito arriva quando un amministratore approva la spesa: allega la foto dello scontrino per fare prima.") }}</p>{% endif %}
-<form method="post" action="{{ url_for('spesa') }}" class="modulo" enctype="multipart/form-data" id="modulo-spesa"
+<p class="aiuto">🔒 {{ _("Il credito arriva quando un amministratore approva la spesa. Le spese di un amministratore le approva un altro amministratore.") }}</p>
+<form method="post" action="{{ url_for('spesa') }}" class="modulo" id="modulo-spesa"
       data-t-totale="{{ _('Totale: {totale}') }}">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <input type="hidden" name="nonce" value="{{ nonce }}">
@@ -33,11 +33,7 @@
   <input id="importo" name="importo" inputmode="decimal" placeholder="{{ _('es. 18,90') }}" value="{{ form.get('importo', '') }}" class="costo">
 
   <p class="anteprima" id="totale" hidden></p>
-  {% if not utente.admin %}
-  <label for="foto">{{ _('Foto dello scontrino (facoltativa)') }}</label>
-  <input id="foto" name="foto" type="file" accept="image/*">
-  {% endif %}
-  <button type="submit" class="btn">{{ _('Registra la spesa') if utente.admin else _('Invia per approvazione') }}</button>
+  <button type="submit" class="btn">{{ _('Invia per approvazione') }}</button>
 </form>
 <p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

@@ -45,7 +45,7 @@
           {{ r.ts|ora }}
           {% if r.tipo == 'pagamento' and r.controparte_id != utente.id %} · {{ _('in attesa di {nome}', nome=nomi.get(r.controparte_id, '?')) }}{% endif %}
           {% if r.id in vecchie %} · <span class="neg">{{ _('ferma da più di 3 giorni') }}</span>{% endif %}
-          {% if r.foto %} · <a href="{{ url_for('scontrino', rid=r.id) }}" target="_blank">🧾 {{ _('scontrino') }}</a>{% endif %}
+          {% if r.tipo == 'spesa' and r.richiedente_id == utente.id %} · {{ _("è una tua spesa: puoi approvarla perché sei l'unico amministratore") }}{% endif %}
         </div>
         {% if r.tipo == 'pagamento' and r.controparte_id == utente.id %}
         <div class="piccolo">{{ _('Conferma solo se hai davvero ricevuto i soldi: il tuo saldo scenderà di {importo}.', importo=r.importo_cent|euro(false)) }}</div>
