@@ -1425,9 +1425,13 @@ def decidi_richiesta(rid, azione):
     if azione not in ("approva", "rifiuta") or not puo_decidere(r, u):
         abort(403)
     richiedente = persona(r["richiedente_id"])
+    motivo = " ".join(request.form.get("motivo", "").split())[:200] if azione == "rifiuta" else ""
     with db():
-        db().execute("UPDATE richieste SET stato=?, deciso_da=?, deciso_ts=? WHERE id=? AND stato='attesa'",
-                     ("approvata" if azione == "approva" else "rifiutata", u["id"], adesso(), rid))
+        n = db().execute("UPDATE richieste SET stato=?, deciso_da=?, deciso_ts=? WHERE id=? AND stato='attesa'",
+                         ("approvata" if azione == "approva" else "rifiutata", u["id"], adesso(), rid)).rowcount
+        if not n:      # qualcun altro l'ha appena decisa (doppio tocco, due admin insieme): non rifare niente
+            flash(_("Questa richiesta è già stata decisa."), "errore")
+            return redirect(request.referrer or url_for("richieste"))
         if azione == "approva":
             if r["tipo"] == "spesa":
                 registra(richiedente["id"], "spesa", r["importo_cent"],
@@ -1435,9 +1439,32 @@ def decidi_richiesta(rid, azione):
                 carica_magazzino(rid, richiedente["id"])
             else:
                 registra_pagamento(richiedente, persona(r["controparte_id"]), r["importo_cent"], r["nota"])
+        if richiedente["id"] != u["id"]:   # issue #1: chi ha fatto la richiesta sa com'è andata
+            invia_messaggio(testo_esito_richiesta(r, richiedente, u, azione == "approva", motivo),
+                            [richiedente["id"]], autore_id=u["id"])
     flash(_("Approvata: {cosa}", cosa=descrivi_richiesta(r)) if azione == "approva"
           else _("Rifiutata: {cosa}", cosa=descrivi_richiesta(r)), "ok")
     return redirect(request.referrer or url_for("richieste"))
+
+
+def testo_esito_richiesta(r, richiedente, chi_decide, approvata, motivo=""):
+    """Messaggio per chi ha fatto la richiesta, nella sua lingua: confermata o rifiutata, da chi e perché."""
+    lingua = richiedente["lingua"] if richiedente["lingua"] in LINGUE else "it"
+    valori = {"importo": euro(r["importo_cent"], segno=False), "nome": nome_completo(chi_decide)}
+    if r["tipo"] == "spesa":
+        valori["cosa"] = r["nota"]
+        chiave = ("✅ La tua spesa per il gruppo «{cosa}» ({importo}) è stata approvata da {nome}: l'importo ti è stato accreditato."
+                  if approvata else
+                  "❌ La tua spesa per il gruppo «{cosa}» ({importo}) è stata rifiutata da {nome}: non ti è stato accreditato niente.")
+    else:
+        valori["altro"] = nome_completo(persona(r["controparte_id"]))
+        chiave = ("✅ Il tuo pagamento di {importo} a {altro} è stato confermato da {nome}: il tuo saldo è salito."
+                  if approvata else
+                  "❌ Il tuo pagamento di {importo} a {altro} è stato rifiutato da {nome}: il saldo non è cambiato.")
+    testo = traduci(chiave, lingua, **valori)
+    if motivo:
+        testo += " " + traduci("Motivo: {motivo}", lingua, motivo=motivo)
+    return testo
 
 
 @app.post("/admin/accesso/<int:pid>/<azione>")

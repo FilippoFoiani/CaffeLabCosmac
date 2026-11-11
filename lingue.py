@@ -441,6 +441,19 @@ EN = {
     "a tutti": "to everyone",
     "a {nomi}": "to {nomi}",
     "Scrivi un messaggio a {nome}": "Write a message to {nome}",
+    # --- esito delle richieste (issue #1): messaggio a chi le ha fatte, nella sua lingua ---
+    "✅ La tua spesa per il gruppo «{cosa}» ({importo}) è stata approvata da {nome}: l'importo ti è stato accreditato.":
+        "✅ Your purchase for the group “{cosa}” ({importo}) was approved by {nome}: the amount has been credited to you.",
+    "❌ La tua spesa per il gruppo «{cosa}» ({importo}) è stata rifiutata da {nome}: non ti è stato accreditato niente.":
+        "❌ Your purchase for the group “{cosa}” ({importo}) was rejected by {nome}: nothing has been credited to you.",
+    "✅ Il tuo pagamento di {importo} a {altro} è stato confermato da {nome}: il tuo saldo è salito.":
+        "✅ Your payment of {importo} to {altro} was confirmed by {nome}: your balance went up.",
+    "❌ Il tuo pagamento di {importo} a {altro} è stato rifiutato da {nome}: il saldo non è cambiato.":
+        "❌ Your payment of {importo} to {altro} was rejected by {nome}: your balance did not change.",
+    "Motivo: {motivo}": "Reason: {motivo}",
+    "Questa richiesta è già stata decisa.": "This request has already been decided.",
+    "Rifiutare questa richiesta? Se vuoi scrivi il motivo (facoltativo): chi l'ha fatta lo vedrà nel messaggio.":
+        "Reject this request? You can write the reason (optional): the person who made it will see it in the message.",
     # --- bilancio del magazzino ---
     "Bilancio": "Balance sheet",
     "Bilancio del magazzino": "Stock balance sheet",

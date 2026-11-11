@@ -1024,9 +1024,11 @@ def test_novita_e_comunicazioni():
     admin = entra_come_admin()
     toka, _ = csrf(admin, "/admin")
     assert vit.post("/admin/comunicazione/nuova", data={"_csrf": tok, "testo": "ciao"}).status_code == 403
+    with app.app_context():
+        prima = modulo.db().execute("SELECT COUNT(*) FROM comunicazioni").fetchone()[0]
     admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "   "})
     with app.app_context():
-        assert modulo.db().execute("SELECT COUNT(*) FROM comunicazioni").fetchone()[0] == 0
+        assert modulo.db().execute("SELECT COUNT(*) FROM comunicazioni").fetchone()[0] == prima
     admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "Domani niente caffè\nfino alle 11"})
     with app.app_context():
         cid = modulo.db().execute("SELECT MAX(id) FROM comunicazioni").fetchone()[0]
@@ -1127,6 +1129,60 @@ def test_messaggi_personali():
     assert "Il tuo pagamento è stato rifiutato" not in home("Nick")
     admin.post(f"/admin/comunicazione/{cid}/ritira", data={"_csrf": toka})
     assert "Passa a ritirare la tazza" not in home("Nick")
+
+
+def test_esito_delle_richieste_al_richiedente():
+    """Issue #1: chi ha fatto un pagamento o una spesa riceve un messaggio quando è confermato o rifiutato."""
+    from html import unescape
+    agnese, federico = app.test_client(), app.test_client()
+    entra(agnese, "Agnese")
+    entra(federico, "Federico")
+
+    def home(c):
+        return unescape(c.get("/").get_data(as_text=True))
+
+    def paga(importo):
+        tok, html = csrf(agnese, "/paga")
+        agnese.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
+                                   "controparte": id_di("Federico"), "importo": importo})
+        return richiesta_in_attesa("pagamento")
+    tokf, _ = csrf(federico, "/richieste")
+    # confermato: Agnese lo sa, Federico (che ha deciso) non riceve niente
+    federico.post(f"/richieste/{paga('1')}/approva", data={"_csrf": tokf})
+    h = home(agnese)
+    assert "Il tuo pagamento di 1,00 € a Federico" in h and "è stato confermato da Federico" in h
+    assert "Il tuo pagamento di 1,00 €" not in home(federico)
+    # rifiutato con il motivo
+    federico.post(f"/richieste/{paga('2')}/rifiuta", data={"_csrf": tokf, "motivo": "  non li ho   ricevuti "})
+    h = home(agnese)
+    assert "Il tuo pagamento di 2,00 €" in h and "è stato rifiutato da Federico" in h
+    assert "Motivo: non li ho ricevuti" in h
+    # una richiesta già decisa non si decide due volte
+    with app.app_context():
+        rid = modulo.db().execute("SELECT MAX(id) FROM richieste WHERE tipo='pagamento'").fetchone()[0]
+    assert federico.post(f"/richieste/{rid}/approva", data={"_csrf": tokf}).status_code == 403
+    # spesa rifiutata da un admin: il messaggio arriva nella lingua di chi l'ha fatta
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET lingua='en' WHERE id=?", (id_di("Agnese"),))
+        modulo.db().commit()
+    tok, html = csrf(agnese, "/spesa")
+    agnese.post("/spesa", data={"_csrf": tok, "nonce": nonce(html), "nota": "zucchero", "importo": "3"})
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/richieste")
+    admin.post(f"/richieste/{richiesta_in_attesa('spesa')}/rifiuta", data={"_csrf": toka, "motivo": "doppia"})
+    assert "Your purchase for the group “zucchero” (3,00 €) was rejected by" in home(agnese)
+    assert "Reason: doppia" in home(agnese)
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET lingua='it' WHERE id=?", (id_di("Agnese"),))
+        modulo.db().commit()
+    # «Ho letto» toglie il messaggio
+    with app.app_context():
+        ids = [r[0] for r in modulo.db().execute(
+            "SELECT comunicazione_id FROM comunicazioni_destinatari WHERE persona_id=?", (id_di("Agnese"),))]
+    tok, _ = csrf(agnese, "/")
+    for cid in ids:
+        agnese.post(f"/comunicazione/{cid}/letta", data={"_csrf": tok, "letto": "1"})
+    assert "è stato confermato da" not in home(agnese)
 
 
 if __name__ == "__main__":

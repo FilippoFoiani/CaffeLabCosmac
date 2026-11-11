@@ -9,6 +9,15 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-11e",
+        "it": [
+            "📬 Quando un tuo pagamento o una tua spesa vengono confermati o rifiutati, ricevi un messaggio in home con chi ha deciso (e il motivo, se rifiutati).",
+        ],
+        "en": [
+            "📬 When one of your payments or purchases is confirmed or rejected, you get a message on the home page saying who decided (and why, if rejected).",
+        ],
+    },
+    {
         "id": "2026-11-11d",
         "it": [
             "✉️ Gli amministratori possono mandare messaggi anche a una o più persone: li vedi in home come «Messaggio per te», finché non spunti «Ho letto».",

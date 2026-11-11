@@ -59,9 +59,10 @@
             <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button class="btn piccolo-btn" type="submit">✔ {{ _('Conferma') }}</button>
           </form>
-          <form method="post" action="{{ url_for('decidi_richiesta', rid=r.id, azione='rifiuta') }}">
+          <form method="post" action="{{ url_for('decidi_richiesta', rid=r.id, azione='rifiuta') }}" class="rifiuta">
             <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-            <button class="btn secondario piccolo-btn" type="submit" data-conferma="{{ _('Rifiutare questa richiesta?') }}">✖ {{ _('Rifiuta') }}</button>
+            <input type="hidden" name="motivo" value="">
+            <button class="btn secondario piccolo-btn" type="submit" data-chiedi-motivo="{{ _("Rifiutare questa richiesta? Se vuoi scrivi il motivo (facoltativo): chi l'ha fatta lo vedrà nel messaggio.") }}">✖ {{ _('Rifiuta') }}</button>
           </form>
         </div>
       </div>
@@ -94,4 +95,17 @@
   {% endif %}
 </section>
 {% if utente.admin %}<p class="aiuto centro"><a href="{{ url_for('admin_registro') }}">🗂 {{ _('Registro approvazioni') }}</a></p>{% endif %}
+{% endblock %}
+
+{% block script %}
+<script>
+  // Rifiuta: chiede il motivo (facoltativo) e lo manda a chi ha fatto la richiesta. «Annulla» = non rifiutare.
+  document.querySelectorAll('[data-chiedi-motivo]').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      var motivo = prompt(b.dataset.chiediMotivo, '');
+      if (motivo === null) { e.preventDefault(); return; }
+      b.form.querySelector('input[name=motivo]').value = motivo.trim().slice(0, 200);
+    });
+  });
+</script>
 {% endblock %}
