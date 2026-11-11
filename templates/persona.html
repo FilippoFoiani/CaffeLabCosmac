@@ -13,4 +13,7 @@
   {% endif %}
 </section>
 <p class="aiuto"><a href="{{ url_for('statistiche', persona=p.id) }}">📈 {{ _('Vedi i suoi consumi') }}</a></p>
+{% if utente.admin and not p.speciale and p.attivo and p.id != utente.id %}
+<p class="aiuto"><a href="{{ url_for('admin', a=p.id, _anchor='comunicazioni') }}">✉️ {{ _('Scrivi un messaggio a {nome}', nome=p|nome) }}</a></p>
+{% endif %}
 {% endblock %}

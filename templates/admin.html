@@ -16,10 +16,21 @@
 <a class="avviso-richieste vuoto" href="{{ url_for('admin_registro') }}">🗂 {{ _('Registro approvazioni: chi ha approvato cosa') }} →</a>
 
 <section class="scheda" id="comunicazioni">
-  <h2>📣 {{ _('Comunicazioni a tutti') }}</h2>
-  <p class="aiuto">{{ _("Compare in home a tutti come notifica, finché ognuno non spunta «Ho letto». Puoi ritirarla quando non serve più.") }}</p>
-  <form method="post" action="{{ url_for('admin_comunicazione_nuova') }}" class="modulo">
+  <h2>📣 {{ _('Comunicazioni e messaggi') }}</h2>
+  <p class="aiuto">{{ _("Compare in home come notifica, finché ognuno non spunta «Ho letto». Puoi mandarla a tutti o solo ad alcune persone, e ritirarla quando non serve più.") }}</p>
+  <form method="post" action="{{ url_for('admin_comunicazione_nuova') }}" class="modulo" id="modulo-comunicazione">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label class="spunta"><input type="radio" name="a_chi" value="tutti" {% if not scelto %}checked{% endif %}> 📣 {{ _('A tutti') }}</label>
+    <label class="spunta"><input type="radio" name="a_chi" value="persone" {% if scelto %}checked{% endif %}> ✉️ {{ _('Solo a persone scelte') }}</label>
+    <div class="scelta-destinatari" id="scelta-destinatari" {% if not scelto %}hidden{% endif %}>
+      <input type="search" id="cerca-destinatari" placeholder="{{ _('Cerca un nome…') }}" aria-label="{{ _('Cerca un nome…') }}" autocomplete="off">
+      <div class="elenco-destinatari">
+        {% for p in destinatarie %}
+        <label class="spunta destinatario" data-nome="{{ (p|nome)|lower }}"><input type="checkbox" name="destinatari" value="{{ p.id }}" {% if scelto == p.id %}checked{% endif %}> {{ p|nome }}</label>
+        {% endfor %}
+      </div>
+      <p class="piccolo" id="n-destinatari"></p>
+    </div>
     <label for="testo-comunicazione">{{ _('Testo') }}</label>
     <textarea id="testo-comunicazione" name="testo" rows="3" maxlength="{{ max_testo }}" required
               placeholder="{{ _('es. Domani la macchinetta è in manutenzione: niente caffè fino alle 11.') }}"></textarea>
@@ -32,7 +43,8 @@
       <div>
         <div class="testo-comunicazione">{{ c.testo }}</div>
         <div class="piccolo">{{ c.ts|ora }}{% if c.nome %} · {{ c|nome }}{% endif %} ·
-          {% if c.attiva %}{{ _('letta da {n} su {tot}', n=c.lette, tot=n_con_accesso) }}{% else %}{{ _('ritirata') }}{% endif %}</div>
+          {% if c.n_destinatari %}✉️ {{ _('a {nomi}', nomi=c.a_chi|join(', ')) }} ·{% else %}📣 {{ _('a tutti') }} ·{% endif %}
+          {% if c.attiva %}{{ _('letta da {n} su {tot}', n=c.lette, tot=c.n_destinatari or n_con_accesso) }}{% else %}{{ _('ritirata') }}{% endif %}</div>
       </div>
       {% if c.attiva %}
       <form method="post" action="{{ url_for('admin_comunicazione_ritira', cid=c.id) }}">
@@ -259,4 +271,33 @@
     <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
   </form>
 </section>
+{% endblock %}
+
+{% block script %}
+<script>
+  // Messaggi personali: mostra l'elenco delle persone solo con «Solo a persone scelte», con la ricerca per nome
+  (function () {
+    var f = document.getElementById('modulo-comunicazione');
+    if (!f) { return; }
+    var box = document.getElementById('scelta-destinatari');
+    var cerca = document.getElementById('cerca-destinatari');
+    var conta = document.getElementById('n-destinatari');
+    var tFrase = {{ _('Scelte: {n}')|tojson }};
+    function aggiorna() {
+      var persone = f.querySelector('input[name=a_chi]:checked').value === 'persone';
+      box.hidden = !persone;
+      var n = f.querySelectorAll('input[name=destinatari]:checked').length;
+      conta.textContent = tFrase.replace('{n}', n);
+    }
+    cerca.addEventListener('input', function () {
+      var q = cerca.value.trim().toLowerCase();
+      f.querySelectorAll('.destinatario').forEach(function (el) {
+        el.hidden = q !== '' && el.dataset.nome.indexOf(q) === -1;
+      });
+    });
+    cerca.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); } });
+    f.addEventListener('change', aggiorna);
+    aggiorna();
+  })();
+</script>
 {% endblock %}

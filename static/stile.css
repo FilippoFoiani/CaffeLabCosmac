@@ -357,3 +357,9 @@ body.con-barra-fondo main { padding-bottom: calc(96px + env(safe-area-inset-bott
 .nota-bicchierino { background: #fff6dd; border: 1px solid #d79b00; color: #5a3d00; border-radius: 12px;
   padding: 10px 12px; font-size: 14px; margin: 8px 0; }
 @media (prefers-color-scheme: dark) { .nota-bicchierino { background: #3a2e10; color: #ffe4a3; } }
+
+/* Messaggi personali (issue #6) */
+.notifica-comunicazione.personale { border-style: dashed; }
+.scelta-destinatari { border: 1px solid var(--bordo); border-radius: 12px; padding: 10px; background: var(--crema); }
+.elenco-destinatari { max-height: 220px; overflow-y: auto; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.destinatario { margin: 0; }

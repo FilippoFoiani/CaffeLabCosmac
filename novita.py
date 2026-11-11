@@ -9,6 +9,15 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-11d",
+        "it": [
+            "✉️ Gli amministratori possono mandare messaggi anche a una o più persone: li vedi in home come «Messaggio per te», finché non spunti «Ho letto».",
+        ],
+        "en": [
+            "✉️ Administrators can also send messages to one or more people: you see them on the home page as “Message for you”, until you tick “I've read it”.",
+        ],
+    },
+    {
         "id": "2026-11-11c",
         "it": [
             "🫗 Sotto «Acqua macchinetta» e «Bicchierino vuoto» ora c'è scritto quando segnarli: l'acqua solo quando metti una bottiglia nuova nella macchinetta, il bicchierino vuoto solo se lo prendi senza caffè.",

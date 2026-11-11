@@ -426,6 +426,21 @@ EN = {
     "Comunicazione pubblicata: la vedono tutti in home finché non spuntano «Ho letto».":
         "Announcement published: everyone sees it on the home page until they tick “I've read it”.",
     "Comunicazione ritirata: non compare più a nessuno.": "Announcement withdrawn: nobody sees it any more.",
+    # --- messaggi personali ---
+    "Comunicazioni e messaggi": "Announcements and messages",
+    "Compare in home come notifica, finché ognuno non spunta «Ho letto». Puoi mandarla a tutti o solo ad alcune persone, e ritirarla quando non serve più.":
+        "It appears on the home page as a notification until each person ticks “I've read it”. You can send it to everyone or only to some people, and withdraw it when it's no longer needed.",
+    "A tutti": "To everyone",
+    "Solo a persone scelte": "Only to selected people",
+    "Cerca un nome…": "Search a name…",
+    "Scelte: {n}": "Selected: {n}",
+    "Scegli almeno una persona a cui mandare il messaggio.": "Choose at least one person to send the message to.",
+    "Messaggio inviato a {nomi}: lo vedono solo loro, in home, finché non spuntano «Ho letto».":
+        "Message sent to {nomi}: only they see it, on the home page, until they tick “I've read it”.",
+    "Messaggio per te": "Message for you",
+    "a tutti": "to everyone",
+    "a {nomi}": "to {nomi}",
+    "Scrivi un messaggio a {nome}": "Write a message to {nome}",
     # --- bilancio del magazzino ---
     "Bilancio": "Balance sheet",
     "Bilancio del magazzino": "Stock balance sheet",

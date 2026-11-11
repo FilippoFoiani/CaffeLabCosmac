@@ -233,6 +233,12 @@ CREATE TABLE IF NOT EXISTS comunicazioni (
     testo     TEXT    NOT NULL,
     attiva    INTEGER NOT NULL DEFAULT 1           -- 0 = ritirata dall'admin: non compare più
 );
+-- Messaggi personali (issue #6): se una comunicazione ha destinatari, la vedono solo loro
+CREATE TABLE IF NOT EXISTS comunicazioni_destinatari (
+    comunicazione_id INTEGER NOT NULL REFERENCES comunicazioni(id),
+    persona_id       INTEGER NOT NULL REFERENCES persone(id),
+    PRIMARY KEY (comunicazione_id, persona_id)
+);
 CREATE TABLE IF NOT EXISTS comunicazioni_lette (
     comunicazione_id INTEGER NOT NULL REFERENCES comunicazioni(id),
     persona_id       INTEGER NOT NULL REFERENCES persone(id),
@@ -886,11 +892,29 @@ def novita_da_leggere(u):
 
 
 def comunicazioni_da_leggere(uid):
+    """Comunicazioni attive non ancora spuntate: quelle per tutti e i messaggi personali per uid."""
     return db().execute("""
-        SELECT c.*, p.nome, p.cognome FROM comunicazioni c LEFT JOIN persone p ON p.id = c.autore_id
-        WHERE c.attiva = 1 AND NOT EXISTS (SELECT 1 FROM comunicazioni_lette l
-                                           WHERE l.comunicazione_id = c.id AND l.persona_id = ?)
-        ORDER BY c.id DESC""", (uid,)).fetchall()
+        SELECT c.*, p.nome, p.cognome,
+               EXISTS (SELECT 1 FROM comunicazioni_destinatari d WHERE d.comunicazione_id = c.id) AS personale
+        FROM comunicazioni c LEFT JOIN persone p ON p.id = c.autore_id
+        WHERE c.attiva = 1
+          AND NOT EXISTS (SELECT 1 FROM comunicazioni_lette l WHERE l.comunicazione_id = c.id AND l.persona_id = ?)
+          AND (NOT EXISTS (SELECT 1 FROM comunicazioni_destinatari d WHERE d.comunicazione_id = c.id)
+               OR EXISTS (SELECT 1 FROM comunicazioni_destinatari d
+                          WHERE d.comunicazione_id = c.id AND d.persona_id = ?))
+        ORDER BY c.id DESC""", (uid, uid)).fetchall()
+
+
+def invia_messaggio(testo, destinatari=(), autore_id=None):
+    """Nuova comunicazione: a tutti se «destinatari» è vuoto, altrimenti solo a quelle persone.
+    Con autore_id vuoto è un messaggio dell'app (es. una richiesta rifiutata). Chi la scrive l'ha già letta."""
+    cid = db().execute("INSERT INTO comunicazioni (ts, autore_id, testo) VALUES (?,?,?)",
+                       (adesso(), autore_id, testo)).lastrowid
+    db().executemany("INSERT OR IGNORE INTO comunicazioni_destinatari VALUES (?,?)",
+                     [(cid, pid) for pid in destinatari])
+    if autore_id:
+        db().execute("INSERT OR IGNORE INTO comunicazioni_lette VALUES (?,?,?)", (cid, autore_id, adesso()))
+    return cid
 
 
 @app.post("/novita/lette")
@@ -1970,6 +1994,7 @@ def admin():
                                        if limite_debito()[0] and p["saldo"] < -limite_debito()[0]),
                            n_da_approvare=conta_da_fare(g.utente),
                            comunicazioni=comunicazioni_admin(), max_testo=MAX_TESTO_COMUNICAZIONE,
+                           destinatarie=persone_destinatarie(), scelto=request.args.get("a", type=int),
                            n_con_accesso=sum(1 for p in righe if p["attivo"] and not p["speciale"]
                                              and p["pin_hash"] and p["approvato"]),
                            n_senza_email=sum(1 for p in persone_neg if not p["email"]),
@@ -2413,13 +2438,23 @@ MAX_TESTO_COMUNICAZIONE = 1000
 
 
 def comunicazioni_admin():
-    """Ultime comunicazioni con quante persone le hanno lette (su quelle che possono entrare)."""
-    return db().execute("""
+    """Ultime comunicazioni con quante persone le hanno lette. Per i messaggi personali contano
+    solo i destinatari (n_destinatari > 0), e «a_chi» è l'elenco dei loro nomi."""
+    righe = db().execute("""
         SELECT c.*, p.nome, p.cognome,
+               (SELECT COUNT(*) FROM comunicazioni_destinatari d WHERE d.comunicazione_id = c.id) AS n_destinatari,
                (SELECT COUNT(*) FROM comunicazioni_lette l JOIN persone q ON q.id = l.persona_id
-                WHERE l.comunicazione_id = c.id AND q.attivo = 1 AND q.speciale = 0) AS lette
+                WHERE l.comunicazione_id = c.id AND q.attivo = 1 AND q.speciale = 0
+                  AND (NOT EXISTS (SELECT 1 FROM comunicazioni_destinatari d WHERE d.comunicazione_id = c.id)
+                       OR EXISTS (SELECT 1 FROM comunicazioni_destinatari d
+                                  WHERE d.comunicazione_id = c.id AND d.persona_id = l.persona_id))) AS lette
         FROM comunicazioni c LEFT JOIN persone p ON p.id = c.autore_id
         ORDER BY c.id DESC LIMIT 15""").fetchall()
+    a_chi = {}
+    for r in db().execute("""SELECT d.comunicazione_id, q.nome, q.cognome FROM comunicazioni_destinatari d
+                             JOIN persone q ON q.id = d.persona_id ORDER BY LOWER(q.nome)""").fetchall():
+        a_chi.setdefault(r["comunicazione_id"], []).append(nome_completo(r))
+    return [dict(r, a_chi=a_chi.get(r["id"], [])) for r in righe]
 
 
 @app.post("/admin/comunicazione/nuova")
@@ -2430,13 +2465,27 @@ def admin_comunicazione_nuova():
         flash(_("Scrivi il testo della comunicazione (al massimo {n} caratteri).", n=MAX_TESTO_COMUNICAZIONE),
               "errore")
         return redirect(url_for("admin") + "#comunicazioni")
+    destinatari = []
+    if request.form.get("a_chi") == "persone":
+        validi = {p["id"] for p in persone_destinatarie()}
+        destinatari = sorted({pid for pid in request.form.getlist("destinatari", type=int) if pid in validi})
+        if not destinatari:
+            flash(_("Scegli almeno una persona a cui mandare il messaggio."), "errore")
+            return redirect(url_for("admin") + "#comunicazioni")
     with db():
-        cid = db().execute("INSERT INTO comunicazioni (ts, autore_id, testo) VALUES (?,?,?)",
-                           (adesso(), g.utente["id"], testo)).lastrowid
-        # chi la scrive l'ha già letta
-        db().execute("INSERT INTO comunicazioni_lette VALUES (?,?,?)", (cid, g.utente["id"], adesso()))
-    flash(_("Comunicazione pubblicata: la vedono tutti in home finché non spuntano «Ho letto»."), "ok")
+        invia_messaggio(testo, destinatari, autore_id=g.utente["id"])
+    if destinatari:
+        flash(_("Messaggio inviato a {nomi}: lo vedono solo loro, in home, finché non spuntano «Ho letto».",
+                nomi=", ".join(nome_completo(persona(pid)) for pid in destinatari)), "ok")
+    else:
+        flash(_("Comunicazione pubblicata: la vedono tutti in home finché non spuntano «Ho letto»."), "ok")
     return redirect(url_for("admin") + "#comunicazioni")
+
+
+def persone_destinatarie():
+    """A chi si può mandare un messaggio personale: le persone attive (non i conti comuni)."""
+    return db().execute("SELECT * FROM persone WHERE attivo = 1 AND speciale = 0 "
+                        "ORDER BY LOWER(nome), LOWER(cognome)").fetchall()
 
 
 @app.post("/admin/comunicazione/<int:cid>/ritira")

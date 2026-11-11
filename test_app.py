@@ -1075,6 +1075,60 @@ def test_spiegazioni_prodotti_e_barra_in_basso():
     assert '<a href="/accedi" class="indietro">' in fuori and 'class="casa"' not in fuori
 
 
+def test_messaggi_personali():
+    """Issue #6: un admin manda un messaggio solo ad alcune persone; lo vedono solo loro, fino a «Ho letto»."""
+    from html import unescape
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin")
+    clienti = {}
+    for nome in ("Vittorio", "Nick", "Giulia"):
+        clienti[nome] = app.test_client()
+        entra(clienti[nome], nome)
+
+    def home(nome):
+        return unescape(clienti[nome].get("/").get_data(as_text=True))
+
+    def quante():
+        with app.app_context():
+            return modulo.db().execute("SELECT COUNT(*) FROM comunicazioni").fetchone()[0]
+    # «solo a persone scelte» senza nessuno (o solo con un conto comune) non parte
+    prima = quante()
+    admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "x", "a_chi": "persone"})
+    admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "x", "a_chi": "persone",
+                                                    "destinatari": [id_di("Cassa")]})
+    assert quante() == prima
+    admin.post("/admin/comunicazione/nuova", data={"_csrf": toka, "testo": "Passa a ritirare la tazza",
+                                                    "a_chi": "persone",
+                                                    "destinatari": [id_di("Vittorio"), id_di("Nick")]})
+    assert quante() == prima + 1
+    for nome in ("Vittorio", "Nick"):
+        assert "Messaggio per te" in home(nome) and "Passa a ritirare la tazza" in home(nome)
+    assert "Passa a ritirare la tazza" not in home("Giulia")
+    with app.app_context():
+        cid = modulo.db().execute("SELECT MAX(id) FROM comunicazioni").fetchone()[0]
+        nomi = sorted(modulo.nome_completo(modulo.persona(id_di(n))) for n in ("Vittorio", "Nick"))
+    pagina = unescape(admin.get("/admin").get_data(as_text=True))
+    assert f"a {', '.join(nomi)}" in pagina and "letta da 0 su 2" in pagina
+    tok, _ = csrf(clienti["Vittorio"], "/")
+    clienti["Vittorio"].post(f"/comunicazione/{cid}/letta", data={"_csrf": tok, "letto": "1"})
+    assert "Passa a ritirare la tazza" not in home("Vittorio") and "Passa a ritirare la tazza" in home("Nick")
+    assert "letta da 1 su 2" in unescape(admin.get("/admin").get_data(as_text=True))
+    # dalla scheda della persona l'admin arriva al modulo con lei già scelta; gli altri non vedono il link
+    scheda = admin.get(f"/persona/{id_di('Giulia')}").get_data(as_text=True)
+    assert f"/admin?a={id_di('Giulia')}#comunicazioni" in scheda
+    assert "Scrivi un messaggio" not in clienti["Nick"].get(f"/persona/{id_di('Giulia')}").get_data(as_text=True)
+    modulo_admin = admin.get(f"/admin?a={id_di('Giulia')}").get_data(as_text=True)
+    assert re.search(rf'name="destinatari" value="{id_di("Giulia")}" checked', modulo_admin)
+    # messaggio dell'app (senza autore), come serviranno per le richieste rifiutate
+    with app.app_context():
+        with modulo.db():
+            modulo.invia_messaggio("Il tuo pagamento è stato rifiutato", [id_di("Giulia")])
+    assert "Il tuo pagamento è stato rifiutato" in home("Giulia")
+    assert "Il tuo pagamento è stato rifiutato" not in home("Nick")
+    admin.post(f"/admin/comunicazione/{cid}/ritira", data={"_csrf": toka})
+    assert "Passa a ritirare la tazza" not in home("Nick")
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

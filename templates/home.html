@@ -7,8 +7,8 @@
 </section>
 
 {% for c in comunicazioni %}
-<section class="notifica notifica-comunicazione" role="status">
-  <div class="avviso-titolo">📣 {{ _('Comunicazione') }}{% if c.nome %} · {{ c|nome }}{% endif %}</div>
+<section class="notifica notifica-comunicazione{% if c.personale %} personale{% endif %}" role="status">
+  <div class="avviso-titolo">{% if c.personale %}✉️ {{ _('Messaggio per te') }}{% else %}📣 {{ _('Comunicazione') }}{% endif %}{% if c.nome %} · {{ c|nome }}{% endif %}</div>
   <p class="testo-comunicazione">{{ c.testo }}</p>
   <div class="riga-campi tra">
     <span class="piccolo">{{ c.ts|ora }}</span>
