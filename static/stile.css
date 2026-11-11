@@ -363,3 +363,6 @@ body.con-barra-fondo main { padding-bottom: calc(96px + env(safe-area-inset-bott
 .scelta-destinatari { border: 1px solid var(--bordo); border-radius: 12px; padding: 10px; background: var(--crema); }
 .elenco-destinatari { max-height: 220px; overflow-y: auto; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .destinatario { margin: 0; }
+
+/* Profilo eliminato (issue #8) */
+.avviso-eliminato { border: 2px dashed var(--rosso); }

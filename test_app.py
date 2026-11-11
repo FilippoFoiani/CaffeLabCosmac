@@ -1185,6 +1185,70 @@ def test_esito_delle_richieste_al_richiedente():
     assert "è stato confermato da" not in home(agnese)
 
 
+def test_eliminare_un_profilo():
+    """Issue #8: un admin elimina un profilo (saldo a 0), lo può ripristinare per 3 giorni, poi è anonimizzato."""
+    from html import unescape
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin")
+    jid = id_di("J.")
+    j = app.test_client()
+    entra(j, "J.")
+
+    def porta_saldo(cent):
+        with app.app_context():
+            modulo.registra(jid, "rettifica", cent - modulo.saldo(jid), nota="Rettifica: test")
+            modulo.db().commit()
+
+    def elimina():
+        return unescape(admin.post(f"/admin/persona/{jid}/elimina", data={"_csrf": toka},
+                                   follow_redirects=True).get_data(as_text=True))
+    # con il saldo diverso da 0, o con richieste in attesa, non si può
+    porta_saldo(500)
+    assert "prima portalo a 0" in elimina()
+    porta_saldo(0)
+    tok, html = csrf(j, "/paga")
+    j.post("/paga", data={"_csrf": tok, "nonce": nonce(html), "verso": "dato",
+                          "controparte": id_di("Nick"), "importo": "1"})
+    assert "Ci sono richieste in attesa" in elimina()
+    j.post(f"/richieste/{richiesta_in_attesa('pagamento')}/annulla", data={"_csrf": tok})
+    # e nemmeno il proprio profilo
+    admin.post(f"/admin/persona/{id_di('Filippo')}/elimina", data={"_csrf": toka})
+    with app.app_context():
+        assert not modulo.persona(id_di("Filippo"))["eliminato_ts"]
+    # eliminato: disconnesso, sparisce da accesso e saldi, compare tra i profili eliminati
+    assert "Profilo di" in elimina()
+    assert j.get("/").status_code == 302
+    assert f'value="{jid}"' not in app.test_client().get("/accedi").get_data(as_text=True)
+    assert f"/persona/{jid}" not in admin.get("/saldi").get_data(as_text=True)
+    pagina = unescape(admin.get("/admin").get_data(as_text=True))
+    assert "Profili eliminati" in pagina and f"/admin/persona/{jid}/ripristina" in pagina
+    assert "Profilo eliminato" in unescape(admin.get(f"/admin/persona/{jid}").get_data(as_text=True))
+    admin.post(f"/admin/persona/{jid}", data={"_csrf": toka, "nome": "Altro", "attivo": "1"})
+    with app.app_context():
+        assert modulo.persona(jid)["nome"] == "J." and not modulo.persona(jid)["attivo"]
+    # ripristinato: torna come prima
+    admin.post(f"/admin/persona/{jid}/ripristina", data={"_csrf": toka})
+    assert f'value="{jid}"' in app.test_client().get("/accedi").get_data(as_text=True)
+    # eliminato di nuovo e passati i 3 giorni: alla prima pagina aperta i dati personali spariscono
+    elimina()
+    with app.app_context():
+        movimenti = modulo.db().execute("SELECT COUNT(*) FROM movimenti WHERE persona_id=?", (jid,)).fetchone()[0]
+        modulo.db().execute("UPDATE persone SET eliminato_ts='2026-01-01T08:00:00+00:00', email='j@example.com', "
+                            "iban='IT60X0542811101000000123456' WHERE id=?", (jid,))
+        modulo.db().commit()
+    admin.get("/")
+    with app.app_context():
+        p = modulo.persona(jid)
+        assert (p["nome"], p["cognome"], p["email"], p["iban"], p["pin_hash"], p["anonimizzato"]) == \
+            ("Persona eliminata", f"#{jid}", "", "", None, 1)
+        assert modulo.db().execute("SELECT COUNT(*) FROM movimenti WHERE persona_id=?", (jid,)).fetchone()[0] == movimenti
+    admin.post(f"/admin/persona/{jid}/ripristina", data={"_csrf": toka})
+    with app.app_context():
+        assert not modulo.persona(jid)["attivo"]                    # dopo i 3 giorni non si ripristina più
+    assert admin.post(f"/admin/persona/{jid}/elimina", data={"_csrf": toka}).status_code == 302
+    assert j.post(f"/admin/persona/{id_di('Nick')}/elimina", data={"_csrf": tok}).status_code in (302, 403)
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

@@ -9,6 +9,15 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-11f",
+        "it": [
+            "🗑 Per gli amministratori: dalla scheda di una persona si può eliminare il suo profilo (solo con saldo a 0). Per 3 giorni si può ripristinare.",
+        ],
+        "en": [
+            "🗑 For admins: a person's profile can now be deleted from their card (only with a zero balance). It can be restored for 3 days.",
+        ],
+    },
+    {
         "id": "2026-11-11e",
         "it": [
             "📬 Quando un tuo pagamento o una tua spesa vengono confermati o rifiutati, ricevi un messaggio in home con chi ha deciso (e il motivo, se rifiutati).",

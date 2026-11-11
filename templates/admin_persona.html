@@ -3,6 +3,20 @@
 {% block contenuto %}
 <h1>{{ p|nome }}</h1>
 <p class="aiuto">{{ _('Saldo attuale:') }} <strong class="{% if saldo < 0 %}neg{% elif saldo > 0 %}pos{% endif %}">{{ saldo|euro }}</strong></p>
+{% if p.eliminato_ts %}
+<section class="scheda avviso-eliminato">
+  <h2>🗑 {{ _('Profilo eliminato') }}</h2>
+  {% if p.anonimizzato %}
+  <p>{{ _('Eliminato definitivamente: i dati personali sono stati cancellati. I suoi movimenti restano, con il nome «Persona eliminata».') }}</p>
+  {% else %}
+  <p>{{ _('Eliminato: {data}. Si può ripristinare fino a: {scadenza}. Dopo, nome, email, PayPal, IBAN e PIN vengono cancellati.', data=p.eliminato_ts|ora, scadenza=scadenza|ora) }}</p>
+  <form method="post" action="{{ url_for('admin_ripristina_persona', pid=p.id) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="btn">↩️ {{ _('Ripristina il profilo') }}</button>
+  </form>
+  {% endif %}
+</section>
+{% else %}
 <section class="scheda">
   <form method="post" class="modulo">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
@@ -29,5 +43,20 @@
   </form>
   {% endif %}
 </section>
+{% endif %}
+{% if not p.speciale and p.id != utente.id %}
+<section class="scheda">
+  <h2>🗑 {{ _('Elimina il profilo') }}</h2>
+  <p class="aiuto">{{ _('Per chi non fa più parte del gruppo. Sparisce subito da accesso, saldi, pagamenti e statistiche. Per 3 giorni puoi ripristinarlo; dopo, nome, email, PayPal, IBAN e PIN vengono cancellati. I movimenti restano, perché servono ai saldi degli altri.') }}</p>
+  {% if saldo != 0 %}
+  <p class="piccolo neg">{{ _('Prima porta il saldo a 0 (con un pagamento o una rettifica): ora è {saldo}.', saldo=saldo|euro) }}</p>
+  {% else %}
+  <form method="post" action="{{ url_for('admin_elimina_persona', pid=p.id) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="btn secondario" data-conferma="{{ _('Eliminare il profilo di {nome}? Per 3 giorni potrai ripristinarlo.', nome=p|nome) }}">🗑 {{ _('Elimina il profilo') }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}

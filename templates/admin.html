@@ -249,7 +249,7 @@
 <section class="scheda">
   <h2>{{ _('Persone e conti') }}</h2>
   <ul class="lista">
-    {% for r in righe %}
+    {% for r in righe if not r.eliminato_ts %}
     <li class="{% if not r.attivo %}spento{% endif %}">
       <div>
         <a href="{{ url_for('admin_persona', pid=r.id) }}">{{ r|nome }}</a>
@@ -261,6 +261,24 @@
     </li>
     {% endfor %}
   </ul>
+  {% if eliminati %}
+  <h3 id="eliminati">🗑 {{ _('Profili eliminati') }}</h3>
+  <p class="aiuto">{{ _('Si possono ripristinare per 3 giorni; dopo, i dati personali vengono cancellati.') }}</p>
+  <ul class="lista">
+    {% for e in eliminati %}
+    <li class="richiesta">
+      <div>
+        <a href="{{ url_for('admin_persona', pid=e.id) }}">{{ e|nome }}</a>
+        <div class="piccolo">{{ _('eliminato: {data}', data=e.eliminato_ts|ora) }}{% if e.da %} · {{ e.da }}{% endif %} · {{ _('ripristinabile fino a: {data}', data=e.scadenza|ora) }}</div>
+      </div>
+      <form method="post" action="{{ url_for('admin_ripristina_persona', pid=e.id) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button type="submit" class="btn secondario piccolo-btn">↩️ {{ _('Ripristina') }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
   <h3>{{ _('Aggiungi persona o conto') }}</h3>
   <form method="post" action="{{ url_for('admin_nuova_persona') }}" class="modulo">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">

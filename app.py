@@ -64,6 +64,7 @@ DESCRIZIONI_DEFAULT = {
     "bicchierino": "Solo se prendi un bicchierino senza caffè: quello del caffè è già contato.",
 }
 FINESTRA_ANNULLA = timedelta(minutes=10)   # entro quanto si può annullare da soli
+FINESTRA_RIPRISTINO = timedelta(days=3)    # per quanto un profilo eliminato si può ancora ripristinare
 ATTESA_MAX_PAGAMENTO = timedelta(days=3)   # poi un pagamento non confermato lo può confermare un admin
 MAX_TENTATIVI_PIN = 5
 DURATA_BLOCCO = timedelta(minutes=10)
@@ -301,7 +302,11 @@ def inizializza_db():
                           ("paypal", "TEXT NOT NULL DEFAULT ''"),
                           ("iban", "TEXT NOT NULL DEFAULT ''"),
                           # ultima voce di novita.py che ha spuntato «Ho letto»
-                          ("novita_lette", "TEXT NOT NULL DEFAULT ''")):
+                          ("novita_lette", "TEXT NOT NULL DEFAULT ''"),
+                          # profilo eliminato da un admin (issue #8): si ripristina per 3 giorni, poi anonimizzato
+                          ("eliminato_ts", "TEXT NOT NULL DEFAULT ''"),
+                          ("eliminato_da", "INTEGER"),
+                          ("anonimizzato", "INTEGER NOT NULL DEFAULT 0")):
             if col not in colonne_p:
                 con.execute(f"ALTER TABLE persone ADD COLUMN {col} {tipo}")
         # Le prime email partiranno dal prossimo lunedì, non appena si installa l'app
@@ -660,6 +665,7 @@ def prima_di_ogni_richiesta():
         if not token or not secrets.compare_digest(token, session.get("_csrf", "")):
             abort(400, "Sessione scaduta")
     g.utente = None
+    completa_eliminazioni()
     g.in_attesa = None
     uid = session.get("uid")
     if uid:
@@ -2022,6 +2028,7 @@ def admin():
                            n_da_approvare=conta_da_fare(g.utente),
                            comunicazioni=comunicazioni_admin(), max_testo=MAX_TESTO_COMUNICAZIONE,
                            destinatarie=persone_destinatarie(), scelto=request.args.get("a", type=int),
+                           eliminati=profili_eliminati(),
                            n_con_accesso=sum(1 for p in righe if p["attivo"] and not p["speciale"]
                                              and p["pin_hash"] and p["approvato"]),
                            n_senza_email=sum(1 for p in persone_neg if not p["email"]),
@@ -2235,10 +2242,84 @@ def admin_nuova_persona():
     return redirect(url_for("admin"))
 
 
+# --------------------------------------------------------------------------
+# Eliminare un profilo (issue #8): reversibile per 3 giorni, poi i dati personali spariscono.
+# I movimenti restano (servono ai saldi degli altri e al bilancio), con il nome «Persona eliminata».
+# --------------------------------------------------------------------------
+def scadenza_ripristino(p):
+    return (da_iso(p["eliminato_ts"]) + FINESTRA_RIPRISTINO).isoformat(timespec="seconds")
+
+
+def completa_eliminazioni():
+    """Dopo FINESTRA_RIPRISTINO: via nome, email, PayPal, IBAN e PIN. Gira alla prima pagina aperta
+    (non ci sono attività pianificate); se non c'è niente da fare non scrive nulla."""
+    limite = (datetime.now(timezone.utc) - FINESTRA_RIPRISTINO).isoformat(timespec="seconds")
+    try:
+        with db():
+            db().execute("""UPDATE persone SET nome='Persona eliminata', cognome='#' || id, email='', paypal='',
+                                   iban='', pin_hash=NULL, admin=0, avvisi_email=0, nuovo_nome='',
+                                   nuovo_cognome='', anonimizzato=1
+                            WHERE eliminato_ts<>'' AND anonimizzato=0 AND eliminato_ts < ?""", (limite,))
+    except sqlite3.Error:
+        app.logger.exception("Anonimizzazione dei profili eliminati non riuscita")
+
+
+def profili_eliminati():
+    """Profili eliminati che si possono ancora ripristinare, con chi li ha eliminati e fino a quando."""
+    righe = db().execute("""SELECT p.*, a.nome AS da_nome, a.cognome AS da_cognome FROM persone p
+                            LEFT JOIN persone a ON a.id = p.eliminato_da
+                            WHERE p.eliminato_ts<>'' AND p.anonimizzato=0 ORDER BY p.eliminato_ts DESC""").fetchall()
+    return [dict(p, scadenza=scadenza_ripristino(p),
+                 da=f"{p['da_nome'] or ''} {p['da_cognome'] or ''}".strip()) for p in righe]
+
+
+@app.post("/admin/persona/<int:pid>/elimina")
+@admin_richiesto
+def admin_elimina_persona(pid):
+    p = persona(pid) or abort(404)
+    nome = nome_completo(p)
+    errore = None
+    if p["speciale"] or p["eliminato_ts"]:
+        errore = _("Questo profilo non si può eliminare.")
+    elif pid == g.utente["id"]:
+        errore = _("Non puoi eliminare il tuo profilo.")
+    elif saldo(pid) != 0:
+        errore = _("Il saldo di {nome} è {saldo}: prima portalo a 0 (con un pagamento o una rettifica), poi elimina il profilo.",
+                   nome=nome, saldo=euro(saldo(pid)))
+    elif db().execute("SELECT 1 FROM richieste WHERE stato='attesa' AND (richiedente_id=? OR controparte_id=?)",
+                      (pid, pid)).fetchone():
+        errore = _("Ci sono richieste in attesa che riguardano {nome}: decidile o annullale prima.", nome=nome)
+    if errore:
+        flash(errore, "errore")
+        return redirect(url_for("admin_persona", pid=pid))
+    with db():
+        db().execute("UPDATE persone SET attivo=0, eliminato_ts=?, eliminato_da=?, "
+                     "versione_sessione = versione_sessione + 1 WHERE id=?", (adesso(), g.utente["id"], pid))
+    flash(_("Profilo di {nome} eliminato. Puoi ripristinarlo per 3 giorni da Amministrazione → Profili eliminati.",
+            nome=nome), "ok")
+    return redirect(url_for("admin") + "#eliminati")
+
+
+@app.post("/admin/persona/<int:pid>/ripristina")
+@admin_richiesto
+def admin_ripristina_persona(pid):
+    p = persona(pid) or abort(404)
+    if not p["eliminato_ts"] or p["anonimizzato"]:
+        flash(_("Questo profilo non si può più ripristinare."), "errore")
+        return redirect(url_for("admin"))
+    with db():
+        db().execute("UPDATE persone SET attivo=1, eliminato_ts='', eliminato_da=NULL WHERE id=?", (pid,))
+    flash(_("Profilo di {nome} ripristinato.", nome=nome_completo(p)), "ok")
+    return redirect(url_for("admin_persona", pid=pid))
+
+
 @app.route("/admin/persona/<int:pid>", methods=["GET", "POST"])
 @admin_richiesto
 def admin_persona(pid):
     p = persona(pid) or abort(404)
+    if request.method == "POST" and p["eliminato_ts"]:
+        flash(_("Il profilo è eliminato: ripristinalo prima di modificarlo."), "errore")
+        return redirect(url_for("admin_persona", pid=pid))
     if request.method == "POST":
         nome = request.form.get("nome", "").strip() or p["nome"]
         cognome = request.form.get("cognome", "").strip()
@@ -2257,7 +2338,8 @@ def admin_persona(pid):
                           1 if (not attivo and p["attivo"]) else 0, pid))
         flash(_("Dati aggiornati."), "ok")
         return redirect(url_for("admin"))
-    return render_template("admin_persona.html", p=p, saldo=saldo(pid))
+    return render_template("admin_persona.html", p=p, saldo=saldo(pid),
+                           scadenza=scadenza_ripristino(p) if p["eliminato_ts"] else None)
 
 
 @app.post("/admin/persona/<int:pid>/reset-pin")
