@@ -180,6 +180,7 @@ input[type=checkbox], input[type=radio] { width: auto; }
 .campo-prezzo { width: 86px; flex: 0 0 86px; }
 .prodotto-admin.spento { opacity: .6; }
 details summary { cursor: pointer; font-weight: 700; color: var(--caffe); margin-top: 14px; }
+.email-anteprima { white-space: pre-wrap; word-break: break-word; font-size: 13px; border: 1px solid var(--grigio); border-radius: 8px; padding: 10px; margin: 8px 0 0; }
 .riga-campi.tra { justify-content: space-between; }
 
 /* Avviso del lunedì */

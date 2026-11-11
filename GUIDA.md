@@ -101,6 +101,23 @@ Ognuno inserisce la propria email al primo accesso o dal **Profilo** (e lì può
 **Quando partono le email.** Il piano gratuito di PythonAnywhere non ha più le attività pianificate per gli account nuovi, quindi l'app manda le email da sola alla **prima pagina aperta da qualcuno dopo lunedì alle 8:00** (in pratica: il primo caffè del lunedì). Partono una sola volta a settimana.
 Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSGI `os.environ["CAFFE_CRON_TOKEN"] = "una-parola-segreta-lunga"` e fai chiamare ogni lunedì alle 8:30 l'indirizzo `https://INDIRIZZO/cron/avvisi?token=una-parola-segreta-lunga` da un servizio gratuito di cron online (per esempio cron-job.org).
 
+**Da chi arriva.** Il mittente è l'account Gmail di `CAFFE_SMTP_USER`, con il nome dell'app: per esempio `Caffè Lab <caffelab.unipg@gmail.com>`. Lo vedi anche in **Amministrazione → Avviso del lunedì** alla voce *Email*. Se qualcuno non la trova, deve cercarla nello spam, con l'oggetto *Caffè Lab: il tuo saldo è …*.
+
+**Come provarla senza disturbare nessuno.** Segui questi passi, in ordine:
+
+1. **Prova a secco.** In **Amministrazione → Avviso del lunedì** apri *Prova a secco*. La pagina mostra il mittente e chi è in negativo adesso. Per ognuno dice se riceverebbe l'email, oppure perché no: non ha l'email, o ha tolto la spunta nel Profilo. Con *Vedi il testo* leggi l'email esatta che riceverebbe. **Non viene spedito nulla** e l'invio automatico del lunedì non cambia. Funziona anche prima di configurare l'email.
+2. **Email di prova a te.** Con il pulsante *Email di prova a me* arriva solo a te un avviso con oggetto *[PROVA]*. Se il tuo saldo non è negativo, l'app finge un saldo di −4,20 €. Se arriva, mittente e password sono giusti. Se non arriva, il messaggio in alto dice l'errore (di solito la password per le app).
+3. **Invio vero, solo se serve.** *Invia adesso a tutti* manda subito l'avviso a tutti quelli che la prova a secco segna come *riceve l'email*. Non sposta l'invio automatico del lunedì: chi è ancora in negativo lo riceve di nuovo lunedì.
+
+Le stesse prove si fanno anche dalla console Bash. La console non legge il file WSGI: per spedire la copia di prova scrivi prima le due variabili `export`, con gli stessi valori del WSGI.
+
+```bash
+cd ~/caffe-lab
+export CAFFE_SMTP_USER="caffelab.unipg@gmail.com" CAFFE_SMTP_PASSWORD="abcd efgh ijkl mnop"
+python3.12 gestione.py avvisi-prova                  # prova a secco: elenco e testo, non spedisce nulla
+python3.12 gestione.py avvisi-prova tu@esempio.it    # una sola copia [PROVA] a quell'indirizzo
+```
+
 ## 5. Primo avvio
 
 1. Apri `https://INDIRIZZO` dal telefono (se vedi "Coming Soon!" l'indirizzo non è quello della scheda Web: controlla il `.eu`).

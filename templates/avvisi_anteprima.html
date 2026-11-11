@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titolo %}{{ _("Prova dell'avviso del lunedì") }} – {{ nome_app }}{% endblock %}
+{% block contenuto %}
+<h1>🧪 {{ _("Prova dell'avviso del lunedì") }}</h1>
+<p class="aiuto">{{ _("Prova a secco: questa pagina mostra chi riceverebbe l'email se partisse adesso e con quale testo. Non viene spedito nulla e il prossimo invio del lunedì non cambia.") }}</p>
+
+<section class="scheda">
+  <ul class="elenco-stato">
+    <li>{{ _('In negativo adesso:') }} <strong>{{ voci|length }}</strong> · {{ _('la ricevono per email: {n}', n=n_ricevono) }}</li>
+    <li>{{ _('Mittente:') }} {% if mittente %}<strong>{{ mittente }}</strong>{% else %}<strong class="neg">{{ _('non configurata') }}</strong> ({{ _('vedi la guida, passo «Email del lunedì»') }}){% endif %}</li>
+    {% if mittente and not email_attiva %}<li class="neg">{{ _('Manca la password (CAFFE_SMTP_PASSWORD): le email non partono.') }}</li>{% endif %}
+  </ul>
+</section>
+
+<section class="scheda">
+  <h2>📋 {{ _('Destinatari') }}</h2>
+  {% if not voci %}<p class="aiuto">{{ _('Nessuno è in negativo: questa settimana non partirebbe nessuna email.') }}</p>{% else %}
+  <ul class="lista">
+    {% for v in voci %}
+    <li class="registro">
+      <div>
+        <div class="forte">{{ v.nome }} <span class="neg">{{ v.saldo|euro }}</span></div>
+        <div class="piccolo">
+          {% if not v.motivo %}<span class="esito ok">✔ {{ _("riceve l'email") }}</span> · {{ v.email }}
+          {% elif v.motivo == 'senza_email' %}<span class="esito">✖ {{ _("senza email: vede solo l'avviso in app") }}</span>
+          {% else %}<span class="esito">✖ {{ _("ha tolto la spunta nel Profilo: vede solo l'avviso in app") }}</span> · {{ v.email }}{% endif %}
+        </div>
+        <details>
+          <summary>{{ _('Vedi il testo') }}</summary>
+          <pre class="email-anteprima"><strong>{{ _('Oggetto:') }} {{ v.oggetto }}</strong>
+
+{{ v.corpo }}</pre>
+        </details>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<p><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
+{% endblock %}

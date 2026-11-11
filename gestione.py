@@ -6,12 +6,15 @@ Comandi di gestione da lanciare nella console (Bash) del server.
   python3 gestione.py admin 23                     rende amministratore la persona con id 23
   python3 gestione.py reset-pin 23                 azzera il PIN della persona con id 23
   python3 gestione.py avvisi                       manda le email del lunedì (una volta a settimana)
+  python3 gestione.py avvisi-prova                 prova a secco: chi le riceverebbe e il testo, senza spedire
+  python3 gestione.py avvisi-prova tu@esempio.it   manda solo a quell'indirizzo una copia [PROVA] dell'avviso
 """
 import os
 import csv
 import sys
 
-from app import adesso, app, connetti, email_configurata, euro, invia_avvisi, leggi_euro
+from app import (NOME_APP, SMTP_USER, adesso, anteprima_avvisi, app, connetti, email_configurata, euro,
+                 invia_avvisi, leggi_euro, spedisci)
 
 
 def importa(percorso):
@@ -72,6 +75,36 @@ def elenco():
               f"{euro(p['saldo']):>12}  {' '.join(flag)}")
 
 
+def prova_avvisi(indirizzo_prova=None):
+    """Senza indirizzo: elenca chi riceverebbe l'avviso e mostra il testo, senza spedire nulla
+    (e senza toccare l'invio del lunedì). Con un indirizzo: manda lì una sola copia [PROVA]."""
+    voci = anteprima_avvisi(connetti(), os.environ.get("CAFFE_URL", ""))
+    if indirizzo_prova:
+        if not email_configurata():
+            raise SystemExit("Email non configurata (CAFFE_SMTP_USER / CAFFE_SMTP_PASSWORD).")
+        if not voci:
+            raise SystemExit("Nessuno è in negativo: non c'è un avviso da mandare come prova.")
+        v = voci[0]
+        try:
+            n, errori = spedisci([(indirizzo_prova, "[PROVA] " + v["oggetto"], v["corpo"])])
+        except Exception as e:   # credenziali sbagliate, rete, …
+            raise SystemExit(f"Invio non riuscito: {type(e).__name__}: {e}")
+        print(f"Inviata a {indirizzo_prova} la copia dell'avviso di {v['nome']}." if n
+              else f"Invio non riuscito: {errori}")
+        return
+    print(f"Mittente: {NOME_APP} <{SMTP_USER}>" if SMTP_USER else "Mittente: email non configurata")
+    if SMTP_USER and not email_configurata():
+        print("Attenzione: manca CAFFE_SMTP_PASSWORD, le email non partirebbero.")
+    motivi = {"": "RICEVE", "senza_email": "senza email", "disattivato": "ha tolto la spunta"}
+    for v in voci:
+        print(f"  {v['nome']:<28} {euro(v['saldo']):>10}  {motivi[v['motivo']]:<18} {v['email']}")
+    print(f"In negativo: {len(voci)}, la ricevono per email: {sum(1 for v in voci if not v['motivo'])}. "
+          "Non è stato spedito nulla.")
+    primo = next((v for v in voci if not v["motivo"]), voci[0] if voci else None)
+    if primo:
+        print(f"\n--- Esempio: email per {primo['nome']} ---\nOggetto: {primo['oggetto']}\n\n{primo['corpo']}")
+
+
 def imposta_admin(pid):
     con = connetti()
     with con:
@@ -113,5 +146,9 @@ if __name__ == "__main__":
                 raise SystemExit("Email non configurata (CAFFE_SMTP_USER / CAFFE_SMTP_PASSWORD).")
             esito = invia_avvisi(connetti(), os.environ.get("CAFFE_URL", ""))
             print("Già inviati questa settimana." if esito is None else esito)
+        elif args == ["avvisi-prova"]:
+            prova_avvisi()
+        elif len(args) == 2 and args[0] == "avvisi-prova" and "@" in args[1]:
+            prova_avvisi(args[1])
         else:
             print(__doc__)

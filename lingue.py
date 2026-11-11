@@ -144,6 +144,24 @@ EN = {
     "Errori: {errori}": "Errors: {errori}",
     "Email di prova a me": "Test email to me",
     "Invia adesso a tutti": "Send to everyone now",
+    "Prova a secco: chi la riceverebbe e con quale testo (non spedisce nulla)":
+        "Dry run: who would get it and with what text (sends nothing)",
+    "Prova dell'avviso del lunedì": "Monday reminder test",
+    "Prova a secco: questa pagina mostra chi riceverebbe l'email se partisse adesso e con quale testo. Non viene spedito nulla e il prossimo invio del lunedì non cambia.":
+        "Dry run: this page shows who would get the email if it went out now, and with what text. Nothing is sent and the next Monday send is not affected.",
+    "la ricevono per email: {n}": "getting it by email: {n}",
+    "Mittente:": "Sender:",
+    "Manca la password (CAFFE_SMTP_PASSWORD): le email non partono.":
+        "The password (CAFFE_SMTP_PASSWORD) is missing: emails won't go out.",
+    "Destinatari": "Recipients",
+    "Nessuno è in negativo: questa settimana non partirebbe nessuna email.":
+        "Nobody is negative: no email would go out this week.",
+    "riceve l'email": "gets the email",
+    "senza email: vede solo l'avviso in app": "no email: only sees the in-app reminder",
+    "ha tolto la spunta nel Profilo: vede solo l'avviso in app":
+        "unticked it in the Profile: only sees the in-app reminder",
+    "Vedi il testo": "Show the text",
+    "Oggetto:": "Subject:",
     "Prodotti e prezzi": "Products and prices",
     "Un nuovo prezzo vale solo per gli acquisti da ora in poi. Si può scegliere se paga chi lo prende oppure un conto comune (es. l'acqua per la macchinetta la paga la Macchinetta del caffè).":
         "A new price only applies to purchases from now on. You can choose whether the person who takes it pays, or a shared account (e.g. machine water is paid by the Coffee machine account).",

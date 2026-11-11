@@ -1662,6 +1662,21 @@ def spedisci(messaggi):
     return inviati, errori
 
 
+def anteprima_avvisi(con, indirizzo):
+    """Chi è in negativo e cosa riceverebbe adesso, senza spedire nulla.
+    Ogni voce: persona, saldo, email, motivo ('' = la riceve, 'senza_email', 'disattivato'),
+    oggetto e corpo dell'email (anche per chi non la riceve, per vedere il testo)."""
+    cred = creditori(con, 3)
+    voci = []
+    for p in sorted((p for p in saldi_persone(con) if p["saldo"] < 0), key=lambda p: p["saldo"]):
+        motivo = "" if p["email"] and p["avvisi_email"] else \
+            ("senza_email" if not p["email"] else "disattivato")
+        oggetto, corpo = testo_email_avviso(p, cred, indirizzo)
+        voci.append({"persona": p, "nome": nome_completo(p), "saldo": p["saldo"], "email": p["email"],
+                     "motivo": motivo, "oggetto": oggetto, "corpo": corpo})
+    return voci
+
+
 def invia_avvisi(con, indirizzo, solo_se_dovuto=True):
     """Manda l'email a chi è in negativo. Con solo_se_dovuto, al massimo una volta a settimana.
     Ritorna un dizionario con l'esito, oppure None se questa settimana è già stato fatto."""
@@ -1672,11 +1687,9 @@ def invia_avvisi(con, indirizzo, solo_se_dovuto=True):
                                 "AND valore<>?", (settimana, settimana)).rowcount
         if not preso:
             return None
-    in_negativo = [p for p in saldi_persone(con) if p["saldo"] < 0]
-    cred = creditori(con, 3)
-    messaggi = [(p["email"], *testo_email_avviso(p, cred, indirizzo))
-                for p in in_negativo if p["email"] and p["avvisi_email"]]
-    esito = {"quando": adesso(), "settimana": settimana, "in_negativo": len(in_negativo),
+    voci = anteprima_avvisi(con, indirizzo)
+    messaggi = [(v["email"], v["oggetto"], v["corpo"]) for v in voci if not v["motivo"]]
+    esito = {"quando": adesso(), "settimana": settimana, "in_negativo": len(voci),
              "con_email": len(messaggi), "inviati": 0, "errori": []}
     try:
         esito["inviati"], esito["errori"] = spedisci(messaggi)
@@ -2086,6 +2099,16 @@ def admin_avvisi_prova():
         except Exception as e:
             flash(_("Invio non riuscito: {errore}", errore=f"{type(e).__name__}: {e}"), "errore")
     return redirect(url_for("admin"))
+
+
+@app.get("/admin/avvisi/anteprima")
+@admin_richiesto
+def admin_avvisi_anteprima():
+    """Prova a secco: chi riceverebbe l'avviso e con quale testo. Non spedisce nulla."""
+    voci = anteprima_avvisi(db(), os.environ.get("CAFFE_URL") or url_for("home", _external=True))
+    return render_template("avvisi_anteprima.html", voci=voci, email_attiva=email_configurata(),
+                           mittente=f"{NOME_APP} <{SMTP_USER}>" if SMTP_USER else "",
+                           n_ricevono=sum(1 for v in voci if not v["motivo"]))
 
 
 @app.post("/admin/avvisi/invia")

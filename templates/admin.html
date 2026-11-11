@@ -124,6 +124,7 @@
     <li>Email: {% if email_attiva %}<strong class="pos">{{ _('attiva') }}</strong>, {{ _('mittente') }} {{ smtp_user }}{% else %}<strong class="neg">{{ _('non configurata') }}</strong> ({{ _('vedi la guida, passo «Email del lunedì»') }}){% endif %}</li>
     {% if esito %}<li>{{ _('Ultimo invio:') }} {{ esito.quando|ora }} · {{ _('{n} email inviate su {tot}', n=esito.inviati, tot=esito.con_email) }}{% if esito.errori %} · <span class="neg">{{ _('Errori: {errori}', errori=esito.errori|join('; ')) }}</span>{% endif %}</li>{% endif %}
   </ul>
+  <p><a href="{{ url_for('admin_avvisi_anteprima') }}">🧪 {{ _('Prova a secco: chi la riceverebbe e con quale testo (non spedisce nulla)') }} →</a></p>
   {% if email_attiva %}
   <div class="riga-campi">
     <form method="post" action="{{ url_for('admin_avvisi_prova') }}">

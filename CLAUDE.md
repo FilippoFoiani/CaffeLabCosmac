@@ -20,7 +20,7 @@ python3 -m pytest -q test_app.py::test_spesa   # a single test
 python3 gestione.py                      # console admin commands: importa | elenco | admin <id> | reset-pin <id> | avvisi
 ```
 
-No linter or build step is configured.
+No linter or build step is configured. GitHub Actions (`.github/workflows/test.yml`) runs the whole test suite on every push and pull request, on Python 3.12 (the PythonAnywhere version) and 3.14.
 
 On Windows, run the tests with UTF-8 mode on (`PYTHONUTF8=1 python -m pytest -q` in Bash, `$env:PYTHONUTF8=1` in PowerShell). Otherwise `gestione.py` crashes printing "−" (U+2212) to the cp1252 console and every test fails in `setup_module`. The production server is Linux and doesn't need this.
 

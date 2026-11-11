@@ -9,6 +9,15 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-11",
+        "it": [
+            "🧪 Per gli amministratori: in «Amministrazione → Avviso del lunedì» c'è la prova a secco, che mostra chi riceverebbe l'email e con quale testo, senza spedire nulla.",
+        ],
+        "en": [
+            "🧪 For admins: “Administration → Monday reminder” now has a dry run that shows who would get the email and with what text, without sending anything.",
+        ],
+    },
+    {
         "id": "2026-11-09b",
         "it": [
             "👤 Imposta subito il tuo profilo: tocca «Profilo ed email» e inserisci la tua email (per l'avviso del lunedì) e PayPal o IBAN (per essere pagato da chi compra il tuo credito). Le istruzioni sono in «Come funziona».",

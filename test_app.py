@@ -501,6 +501,51 @@ def test_email_partono_al_primo_accesso_del_lunedi(monkeypatch):
     assert len(FintoSMTP.inviate) == 1     # non riparte nella stessa settimana
 
 
+def test_prova_a_secco_avvisi(monkeypatch):
+    """La prova a secco mostra chi riceverebbe l'avviso e il testo, ma non spedisce nulla
+    e non tocca la settimana dell'invio automatico."""
+    monkeypatch.setattr(modulo.smtplib, "SMTP", FintoSMTP)
+    monkeypatch.setattr(modulo, "SMTP_USER", "caffelab@gmail.com")
+    monkeypatch.setattr(modulo, "SMTP_PASSWORD", "xxxx")
+    FintoSMTP.inviate.clear()
+    entra(app.test_client(), "Lupi")       # in negativo, senza email
+    with app.app_context():
+        settimana = modulo.impostazione("avviso_settimana")
+    admin = entra_come_admin()
+    assert "Prova a secco" in admin.get("/admin").get_data(as_text=True)
+    import html as _h
+    pagina = _h.unescape(admin.get("/admin/avvisi/anteprima").get_data(as_text=True))
+    assert "caffelab@gmail.com" in pagina                          # il mittente
+    lorenzo = pagina[pagina.index("Lorenzo"):].split("</li>")[0]
+    assert "riceve l'email" in lorenzo and "lorenzo@studenti.unipg.it" in lorenzo
+    assert modulo.TESTO_AVVISO in lorenzo and "−1,50 €" in lorenzo  # il testo dell'email
+    assert "senza email" in pagina[pagina.index("Lupi"):].split("</li>")[0]
+    assert "Vittorio" not in pagina                                # in positivo: non compare
+    with app.app_context():
+        voci = {v["nome"].split()[0]: v for v in modulo.anteprima_avvisi(modulo.db(), "https://x/")}
+        assert voci["Lorenzo"]["motivo"] == "" and voci["Lupi"]["motivo"] == "senza_email"
+        # chi toglie la spunta nel Profilo non la riceve
+        modulo.db().execute("UPDATE persone SET avvisi_email=0 WHERE nome='Lorenzo'")
+        assert {v["nome"].split()[0]: v for v in modulo.anteprima_avvisi(modulo.db(), "https://x/")
+                }["Lorenzo"]["motivo"] == "disattivato"
+        modulo.db().execute("UPDATE persone SET avvisi_email=1 WHERE nome='Lorenzo'")
+        modulo.db().commit()
+    # anche da console, senza spedire
+    out = subprocess.run([sys.executable, os.path.join(QUI, "gestione.py"), "avvisi-prova"],
+                         env=os.environ.copy(), cwd=QUI, check=True, capture_output=True,
+                         text=True, encoding="utf-8").stdout
+    assert "Lorenzo" in out and "RICEVE" in out and "Non è stato spedito nulla" in out
+    assert modulo.TESTO_AVVISO in out
+    # nessuna email partita e l'invio del lunedì è ancora da fare
+    assert FintoSMTP.inviate == []
+    with app.app_context():
+        assert modulo.impostazione("avviso_settimana") == settimana
+    # chi non è admin non la vede
+    c = app.test_client()
+    entra(c, "Daniele")
+    assert c.get("/admin/avvisi/anteprima").status_code in (302, 403)
+
+
 def test_avvertenza_pulizia_dopo_il_caffe():
     c = app.test_client()
     entra(c, "Giacomo")
