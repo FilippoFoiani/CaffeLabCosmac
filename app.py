@@ -2520,6 +2520,31 @@ def errore_http(e):
     return render_template("errore.html", messaggio=messaggi.get(e.code, "Errore.")), e.code
 
 
+def crea_root(pin):
+    """Solo per le prove sul PC: amministratore «root», già approvato, con questo PIN.
+    Se esiste già, gli rimette il PIN e lo riattiva. Ritorna il suo id."""
+    con = connetti()
+    with con:
+        r = con.execute("SELECT id FROM persone WHERE nome='root' AND cognome='' AND speciale=0").fetchone()
+        if r:
+            pid = r["id"]
+        else:
+            pid = con.execute("INSERT INTO persone (nome, cognome, speciale, creato) VALUES ('root', '', 0, ?)",
+                              (adesso(),)).lastrowid
+        con.execute("UPDATE persone SET pin_hash=?, admin=1, approvato=1, attivo=1, tentativi=0, "
+                    "bloccato_fino=NULL, nuovo_nome='', nuovo_cognome='' WHERE id=?",
+                    (generate_password_hash(pin), pid))
+    con.close()
+    return pid
+
+
 if __name__ == "__main__":
     # Solo per provarla sul tuo PC: python3 app.py  ->  http://localhost:5000
+    # Sul server (WSGI) questo blocco non viene mai eseguito, quindi l'utente root non c'è.
+    if os.environ.get("CAFFE_ROOT", "1") != "0":
+        pin_root = os.environ.get("CAFFE_ROOT_PIN", "0000")
+        if not pin_valido(pin_root):
+            raise SystemExit("CAFFE_ROOT_PIN deve avere da 4 a 8 cifre.")
+        crea_root(pin_root)
+        print(f"Per le prove: entra come «root» con il PIN {pin_root} (amministratore, già approvato).")
     app.run(host="0.0.0.0", port=5000, debug=False)

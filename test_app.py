@@ -1051,3 +1051,15 @@ def test_hidden_vince_sul_css():
     # Il riquadro "oltre il limite" è nascosto con l'attributo hidden: il CSS non deve annullarlo
     css = open(os.path.join(os.path.dirname(__file__), "static", "stile.css"), encoding="utf-8").read()
     assert "[hidden] { display: none !important; }" in css
+
+
+def test_utente_root_per_le_prove_in_locale():
+    """python3 app.py crea «root», amministratore già approvato: si entra subito con il PIN."""
+    with app.app_context():
+        pid = modulo.crea_root("0000")
+        assert modulo.crea_root("4321") == pid          # la seconda volta non lo duplica, cambia il PIN
+    c = app.test_client()
+    tok, _ = csrf(c)
+    r = c.post("/accedi", data={"_csrf": tok, "persona_id": pid, "pin": "4321"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")   # niente attesa di approvazione
+    assert c.get("/admin").status_code == 200
