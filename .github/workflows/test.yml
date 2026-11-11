@@ -23,9 +23,10 @@ jobs:
           cache: pip
 
       - name: Installa le dipendenze
+        # Pillow per l'app è facoltativo (su PythonAnywhere c'è già), ma test_spesa lo usa
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
+          pip install -r requirements.txt pytest Pillow
 
       - name: Esegui i test
         env:

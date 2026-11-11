@@ -225,6 +225,6 @@ python3 gestione.py importa saldi_iniziali.csv
 python3 app.py
 ```
 
-Poi apri http://localhost:5000. Per i test automatici: `pip install pytest` e `python3 -m pytest -q`.
+Poi apri http://localhost:5000. Per i test automatici: `pip install pytest Pillow` e `python3 -m pytest -q`.
 
 Per non dover attivare un account e farlo approvare, `python3 app.py` crea da solo l'utente **root**, amministratore già approvato, con PIN **0000**: sceglilo nell'elenco di *Accedi*. Per un altro PIN: `CAFFE_ROOT_PIN=1234 python3 app.py`; per non crearlo: `CAFFE_ROOT=0 python3 app.py`. Sul server l'app parte dal file WSGI e root non viene mai creato. Però, se l'hai creato sul PC, **non caricare quel `caffe.db` sul server**: root resterebbe amministratore con PIN 0000.

@@ -15,7 +15,7 @@ For every user-visible change, also add an entry at the **top** of `NOVITA` in `
 ```bash
 pip install -r requirements.txt          # Flask, openpyxl, segno (QR), tzdata
 python3 app.py                           # dev server on http://localhost:5000; creates admin "root", PIN 0000 (CAFFE_ROOT_PIN / CAFFE_ROOT=0)
-python3 -m pytest -q                     # all tests (pytest is not in requirements.txt)
+python3 -m pytest -q                     # all tests (needs pytest and Pillow, which are not in requirements.txt)
 python3 -m pytest -q test_app.py::test_spesa   # a single test
 python3 gestione.py                      # console admin commands: importa | elenco | admin <id> | reset-pin <id> | avvisi
 ```
