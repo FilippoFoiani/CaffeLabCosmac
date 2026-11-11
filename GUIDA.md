@@ -141,7 +141,8 @@ PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda: si 
 
 ## Come funziona per il gruppo
 
-- **Acquisto**: per ogni prodotto ci sono − e +; si sceglie la quantità di ciascuno e si tocca **Conferma** una volta sola. Il pulsante mostra quanto va a proprio carico (l'acqua per la macchinetta va sulla Macchinetta del caffè). Per 10 minuti si può annullare l'intero acquisto.
+- **Acquisto**: per ogni prodotto ci sono − e +; si sceglie la quantità di ciascuno e si tocca **Conferma** una volta sola. Il pulsante mostra quanto va a proprio carico (l'acqua per la macchinetta va sulla Macchinetta del caffè). Per 10 minuti si può annullare l'intero acquisto. Sotto *Acqua macchinetta* e *Bicchierino vuoto* c'è una riga che spiega quando segnarli: l'acqua **solo quando si mette una bottiglia nuova nella macchinetta**, il bicchierino vuoto **solo se si prende un bicchierino senza caffè** (quello del caffè è già contato). Se si scelgono caffè e bicchierino vuoto insieme compare un avviso. Le spiegazioni si cambiano in *Amministrazione → Prodotti e prezzi*, nel campo *Spiegazione sotto il prodotto*.
+- **Barra in basso**: in tutte le pagine tranne la principale, in fondo allo schermo restano sempre visibili **← Indietro** e **🏠 Home**, anche nelle pagine lunghe come i movimenti.
 - **Pagamenti tra persone**:
   - *Ho dato dei soldi a qualcuno*: se dai 5 € a chi è in credito, il tuo saldo sale di 5 € e il suo scende di 5 €. **Conta solo quando chi ha ricevuto i soldi conferma** dalla pagina *Richieste* (per la Cassa conferma un amministratore). Vale anche quando paga un amministratore: nessuno può confermare un proprio pagamento.
   - *Mi prendo il debito di qualcuno*: ti accolli una parte del debito di un altro (come Massi con Martin sul foglio). Vale subito, perché pesa solo su di te.

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('admin') }}{% endblock %}
 {% block contenuto %}
 <h1>{{ p|nome }}</h1>
 <p class="aiuto">{{ _('Saldo attuale:') }} <strong class="{% if saldo < 0 %}neg{% elif saldo > 0 %}pos{% endif %}">{{ saldo|euro }}</strong></p>
@@ -29,5 +30,4 @@
   {% endif %}
 </section>
 {% endif %}
-<p class="aiuto centro"><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
 {% endblock %}

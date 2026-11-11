@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') }}{% endblock %}
 {% block titolo %}{{ _('Statistiche') }} – {{ nome_app }}{% endblock %}
 
 {# "☕ 3 · 💧 1" per un dizionario {prodotto_id: quantità}; "0" se vuoto #}
@@ -64,5 +65,4 @@
 </ul>
 {% endif %}
 <p class="aiuto">{{ _("Contano gli acquisti segnati nell'app, non quelli del foglio cartaceo. Come nel saldo, l'acqua per la macchinetta conta sulla Macchinetta del caffè, non su chi l'ha presa.") }}</p>
-<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

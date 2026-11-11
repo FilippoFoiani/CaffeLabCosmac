@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('admin') }}{% endblock %}
 {% block titolo %}{{ _('Magazzino') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>📦 {{ _('Magazzino') }}</h1>
@@ -90,5 +91,4 @@
   </ul>
   {% endif %}
 </section>
-<p class="aiuto centro"><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
 {% endblock %}

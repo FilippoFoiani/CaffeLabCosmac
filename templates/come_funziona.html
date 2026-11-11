@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') if utente else url_for('accedi') }}{% endblock %}
 {% block titolo %}{{ _('Come funziona') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <div class="guida">
@@ -99,5 +100,4 @@
   </ul>
 </section>
 </div>
-<p class="aiuto centro"><a href="{{ url_for('home') if utente else url_for('accedi') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

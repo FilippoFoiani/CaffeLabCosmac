@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') }}{% endblock %}
 {% block titolo %}{{ _('Amministrazione') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>{{ _('Amministrazione') }}</h1>
@@ -169,6 +170,7 @@
       <input name="prezzo" inputmode="decimal" class="campo-prezzo" aria-label="{{ _('Prezzo in euro') }}"
              value="{{ '%.2f'|format(pr.prezzo_cent / 100)|replace('.', ',') }}">
     </div>
+    <input name="descrizione" value="{{ pr.descrizione }}" maxlength="150" placeholder="{{ _('Spiegazione sotto il prodotto (facoltativa)') }}" aria-label="{{ _('Spiegazione sotto il prodotto (facoltativa)') }}">
     <select name="addebito_id" aria-label="{{ _('Chi paga') }}">
       <option value="">{{ _('Paga chi lo prende') }}</option>
       {% for c in conti %}<option value="{{ c.id }}" {% if c.id == pr.addebito_id %}selected{% endif %}>{{ _('Paga il conto {conto}', conto=c|nome) }}</option>{% endfor %}
@@ -188,6 +190,7 @@
         <input name="nome" placeholder="{{ _('Nome') }}" required aria-label="{{ _('Nome prodotto') }}">
         <input name="prezzo" inputmode="decimal" placeholder="0,50" class="campo-prezzo" required aria-label="{{ _('Prezzo in euro') }}">
       </div>
+      <input name="descrizione" maxlength="150" placeholder="{{ _('Spiegazione sotto il prodotto (facoltativa)') }}" aria-label="{{ _('Spiegazione sotto il prodotto (facoltativa)') }}">
       <select name="addebito_id" aria-label="{{ _('Chi paga') }}">
         <option value="">{{ _('Paga chi lo prende') }}</option>
         {% for c in conti %}<option value="{{ c.id }}">{{ _('Paga il conto {conto}', conto=c|nome) }}</option>{% endfor %}
@@ -256,5 +259,4 @@
     <button type="submit" class="btn">{{ _('Aggiungi') }}</button>
   </form>
 </section>
-<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

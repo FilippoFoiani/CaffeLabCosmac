@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('saldi') }}{% endblock %}
 {% from "_scheda.html" import scheda_persona %}
 {% block titolo %}{{ p|nome }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
@@ -12,5 +13,4 @@
   {% endif %}
 </section>
 <p class="aiuto"><a href="{{ url_for('statistiche', persona=p.id) }}">📈 {{ _('Vedi i suoi consumi') }}</a></p>
-<p class="aiuto centro"><a href="{{ url_for('saldi') }}">← {{ _('Saldi di tutti') }}</a></p>
 {% endblock %}

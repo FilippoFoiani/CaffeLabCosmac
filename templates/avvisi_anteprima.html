@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('admin') }}{% endblock %}
 {% block titolo %}{{ _("Prova dell'avviso del lunedì") }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>🧪 {{ _("Prova dell'avviso del lunedì") }}</h1>
@@ -38,5 +39,4 @@
   {% endif %}
 </section>
 
-<p><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
 {% endblock %}

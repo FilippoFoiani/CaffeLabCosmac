@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') }}{% endblock %}
 {% block titolo %}{{ _('Movimenti') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>{% if tutti %}{{ _('Tutti i movimenti') }}{% else %}{{ _('I miei movimenti') }}{% endif %}</h1>
@@ -30,5 +31,4 @@
   </li>
   {% endfor %}
 </ul>
-<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

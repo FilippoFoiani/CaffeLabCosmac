@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') }}{% endblock %}
 {% block titolo %}{{ _('Profilo') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>{{ _('Profilo') }}</h1>
@@ -26,5 +27,4 @@
   </form>
   <p class="aiuto">{{ _('Lingua') }}: <a href="{{ url_for('cambia_lingua', codice='it') }}">Italiano</a> · <a href="{{ url_for('cambia_lingua', codice='en') }}">English</a></p>
 </section>
-<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

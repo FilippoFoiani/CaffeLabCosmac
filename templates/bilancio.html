@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('admin_magazzino') }}{% endblock %}
 {% block titolo %}{{ _('Bilancio del magazzino') }} – {{ nome_app }}{% endblock %}
 
 {# Importo o «—» se manca il costo (nessuna spesa con quell'articolo); con_segno per differenze e margini #}
@@ -58,5 +59,4 @@
 </section>
 {% endfor %}
 {% endif %}
-<p class="aiuto centro"><a href="{{ url_for('admin_magazzino') }}">← {{ _('Magazzino') }}</a> · <a href="{{ url_for('admin') }}">{{ _('Amministrazione') }}</a></p>
 {% endblock %}

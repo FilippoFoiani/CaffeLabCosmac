@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') }}{% endblock %}
 {% block titolo %}{{ _('Richieste') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>{{ _('Richieste') }}</h1>
@@ -93,5 +94,4 @@
   {% endif %}
 </section>
 {% if utente.admin %}<p class="aiuto centro"><a href="{{ url_for('admin_registro') }}">🗂 {{ _('Registro approvazioni') }}</a></p>{% endif %}
-<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}

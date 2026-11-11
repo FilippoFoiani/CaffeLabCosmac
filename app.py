@@ -58,6 +58,11 @@ RICETTE_DEFAULT = {
     "acqua_macchinetta": {"bottiglie": 1},
     "bicchierino": {"bicchierini": 1},
 }
+# Spiegazione sotto il prodotto, in home (l'admin la cambia da Amministrazione → Prodotti e prezzi)
+DESCRIZIONI_DEFAULT = {
+    "acqua_macchinetta": "Solo quando metti una bottiglia nuova nel serbatoio della macchinetta.",
+    "bicchierino": "Solo se prendi un bicchierino senza caffè: quello del caffè è già contato.",
+}
 FINESTRA_ANNULLA = timedelta(minutes=10)   # entro quanto si può annullare da soli
 ATTESA_MAX_PAGAMENTO = timedelta(days=3)   # poi un pagamento non confermato lo può confermare un admin
 MAX_TENTATIVI_PIN = 5
@@ -272,6 +277,9 @@ def inizializza_db():
         colonne = {r["name"] for r in con.execute("PRAGMA table_info(movimenti)")}
         if "prodotto_id" not in colonne:
             con.execute("ALTER TABLE movimenti ADD COLUMN prodotto_id INTEGER REFERENCES prodotti(id)")
+        colonne_pr = {r["name"] for r in con.execute("PRAGMA table_info(prodotti)")}
+        if "descrizione" not in colonne_pr:      # spiegazione sotto il prodotto, in home
+            con.execute("ALTER TABLE prodotti ADD COLUMN descrizione TEXT NOT NULL DEFAULT ''")
         colonne_p = {r["name"] for r in con.execute("PRAGMA table_info(persone)")}
         for col, tipo in (("email", "TEXT NOT NULL DEFAULT ''"),
                           ("avvisi_email", "INTEGER NOT NULL DEFAULT 1"),
@@ -325,6 +333,10 @@ def inizializza_db():
             con.execute("INSERT INTO prodotti (codice, nome, emoji, prezzo_cent, addebito_id, ordine)"
                         " VALUES (?,?,?,?,?,?)", (pr["codice"], pr["nome"], pr["emoji"], prezzo,
                                                   addebito, i))
+        # Spiegazioni di partenza sotto i prodotti che si sbagliano più spesso (una volta sola)
+        if con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('descrizioni_iniziali', '1')").rowcount:
+            for codice, testo in DESCRIZIONI_DEFAULT.items():
+                con.execute("UPDATE prodotti SET descrizione=? WHERE codice=? AND descrizione=''", (testo, codice))
         # Magazzino: articoli di partenza e cosa consuma ogni prodotto (una volta sola)
         for i, ar in enumerate(ARTICOLI_DEFAULT):
             con.execute("INSERT OR IGNORE INTO articoli (codice, nome, emoji, soglia, ordine) VALUES (?,?,?,?,?)",
@@ -2111,21 +2123,22 @@ def _leggi_prodotto_da_form():
         conto = persona(addebito)
         if not conto or not conto["speciale"]:
             addebito = None
-    return nome, emoji, prezzo, addebito
+    descrizione = " ".join(request.form.get("descrizione", "").split())[:150]
+    return nome, emoji, prezzo, addebito, descrizione
 
 
 @app.post("/admin/prodotto/<int:prid>")
 @admin_richiesto
 def admin_prodotto(prid):
     pr = prodotto(prid) or abort(404)
-    nome, emoji, prezzo, addebito = _leggi_prodotto_da_form()
+    nome, emoji, prezzo, addebito, descrizione = _leggi_prodotto_da_form()
     if not nome or prezzo is None:
         flash(_("Servono un nome e un prezzo valido."), "errore")
         return redirect(url_for("admin"))
     attivo = 1 if request.form.get("attivo") else 0
     with db():
-        db().execute("UPDATE prodotti SET nome=?, emoji=?, prezzo_cent=?, addebito_id=?, attivo=?"
-                     " WHERE id=?", (nome, emoji, prezzo, addebito, attivo, prid))
+        db().execute("UPDATE prodotti SET nome=?, emoji=?, prezzo_cent=?, addebito_id=?, attivo=?, descrizione=?"
+                     " WHERE id=?", (nome, emoji, prezzo, addebito, attivo, descrizione, prid))
     flash(_("{nome} aggiornato. Il prezzo vale per gli acquisti da ora in poi.", nome=nome), "ok")
     return redirect(url_for("admin"))
 
@@ -2133,14 +2146,14 @@ def admin_prodotto(prid):
 @app.post("/admin/prodotto/nuovo")
 @admin_richiesto
 def admin_prodotto_nuovo():
-    nome, emoji, prezzo, addebito = _leggi_prodotto_da_form()
+    nome, emoji, prezzo, addebito, descrizione = _leggi_prodotto_da_form()
     if not nome or prezzo is None:
         flash(_("Servono un nome e un prezzo valido."), "errore")
         return redirect(url_for("admin"))
     ordine = (db().execute("SELECT MAX(ordine) AS m FROM prodotti").fetchone()["m"] or 0) + 1
     with db():
-        db().execute("INSERT INTO prodotti (nome, emoji, prezzo_cent, addebito_id, ordine) "
-                     "VALUES (?,?,?,?,?)", (nome, emoji, prezzo, addebito, ordine))
+        db().execute("INSERT INTO prodotti (nome, emoji, prezzo_cent, addebito_id, ordine, descrizione) "
+                     "VALUES (?,?,?,?,?,?)", (nome, emoji, prezzo, addebito, ordine, descrizione))
     flash(_("Prodotto aggiunto: {nome}.", nome=nome), "ok")
     return redirect(url_for("admin"))
 

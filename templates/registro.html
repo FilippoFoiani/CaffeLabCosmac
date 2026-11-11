@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('admin') }}{% endblock %}
 {% block titolo %}{{ _('Registro approvazioni') }} – {{ nome_app }}{% endblock %}
 {% macro esito(stato) -%}
   {%- if stato in ('approvata', 'approvato') %}<span class="esito ok">✔ {{ _(stato) }}</span>
@@ -63,5 +64,4 @@
 </section>
 {% endif %}
 {% endfor %}
-<p class="aiuto centro"><a href="{{ url_for('admin') }}">← {{ _('Amministrazione') }}</a></p>
 {% endblock %}

@@ -13,7 +13,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='stile.css', v=versione_css) }}">
   <title>{% block titolo %}{{ nome_app }}{% endblock %}</title>
 </head>
-<body>
+{% set dove_indietro = self.indietro()|trim %}
+<body{% if dove_indietro %} class="con-barra-fondo"{% endif %}>
   <header class="barra">
     <a href="{{ url_for('home') }}" class="logo">☕ {{ nome_app }}</a>
     <div class="barra-destra">
@@ -37,6 +38,15 @@
     {% endwith %}
     {% block contenuto %}{% endblock %}
   </main>
+  {# Barra sempre visibile in basso (issue #9): ogni pagina dice dove porta «Indietro» con il blocco «indietro» #}
+  {% if dove_indietro %}
+  <nav class="barra-fondo" aria-label="{{ _('Navigazione') }}">
+    <div class="barra-fondo-dentro">
+      <a href="{% block indietro %}{% endblock %}" class="indietro">← {{ _('Indietro') }}</a>
+      {% if utente %}<a href="{{ url_for('home') }}" class="casa">🏠 {{ _('Home') }}</a>{% endif %}
+    </div>
+  </nav>
+  {% endif %}
   <script>
     // Chiede conferma prima delle azioni irreversibili
     document.querySelectorAll('[data-conferma]').forEach(function (el) {

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block indietro %}{{ url_for('home') }}{% endblock %}
 {% block titolo %}{{ _('Spesa') }} – {{ nome_app }}{% endblock %}
 {% block contenuto %}
 <h1>{{ _('Ho comprato per il gruppo') }}</h1>
@@ -35,7 +36,6 @@
   <p class="anteprima" id="totale" hidden></p>
   <button type="submit" class="btn">{{ _('Invia per approvazione') }}</button>
 </form>
-<p class="aiuto centro"><a href="{{ url_for('home') }}">← {{ _('Torna indietro') }}</a></p>
 {% endblock %}
 
 {% block script %}

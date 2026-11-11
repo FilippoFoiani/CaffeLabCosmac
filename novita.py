@@ -9,6 +9,17 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-11c",
+        "it": [
+            "🫗 Sotto «Acqua macchinetta» e «Bicchierino vuoto» ora c'è scritto quando segnarli: l'acqua solo quando metti una bottiglia nuova nella macchinetta, il bicchierino vuoto solo se lo prendi senza caffè.",
+            "⬅️ In fondo allo schermo ci sono sempre «Indietro» e «Home»: niente più scorrere fino in fondo nelle pagine lunghe.",
+        ],
+        "en": [
+            "🫗 Under “Machine water” and “Empty cup” it now says when to record them: water only when you put a new bottle in the machine, the empty cup only if you take it without coffee.",
+            "⬅️ “Back” and “Home” are always at the bottom of the screen: no more scrolling to the end of long pages.",
+        ],
+    },
+    {
         "id": "2026-11-11b",
         "it": [
             "🛒 Anche le spese per il gruppo degli amministratori ora vanno approvate, da un altro amministratore.",

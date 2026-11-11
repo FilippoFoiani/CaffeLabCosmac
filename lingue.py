@@ -325,6 +325,17 @@ EN = {
     "questa settimana": "this week",
     "dal {data}": "from {data}",
     "Torna indietro": "Back",
+    # --- barra in basso e spiegazioni dei prodotti ---
+    "Indietro": "Back",
+    "Home": "Home",
+    "Navigazione": "Navigation",
+    "Spiegazione sotto il prodotto (facoltativa)": "Explanation under the product (optional)",
+    "Solo quando metti una bottiglia nuova nel serbatoio della macchinetta.":
+        "Only when you put a new bottle in the machine's water tank.",
+    "Solo se prendi un bicchierino senza caffè: quello del caffè è già contato.":
+        "Only if you take a cup without coffee: the coffee's cup is already counted.",
+    "Il bicchierino del caffè è già contato: «Bicchierino vuoto» serve solo se prendi un bicchierino senza caffè.":
+        "The coffee's cup is already counted: “Empty cup” is only for when you take a cup without coffee.",
 
     # --- descrizioni dei movimenti ---
     "oggi {ora}": "today {ora}",

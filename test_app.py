@@ -1041,6 +1041,40 @@ def test_novita_e_comunicazioni():
     assert "Domani niente caffè" not in home(nick)
 
 
+def test_spiegazioni_prodotti_e_barra_in_basso():
+    """Issue #7: quando segnare acqua macchinetta e bicchierino vuoto. Issue #9: Indietro e Home sempre visibili."""
+    from html import unescape
+    from lingue import EN
+    assert all(t in EN for t in modulo.DESCRIZIONI_DEFAULT.values())   # le spiegazioni di partenza hanno l'inglese
+    c = app.test_client()
+    entra(c, "Giulia")
+    home = unescape(c.get("/").get_data(as_text=True))
+    for testo in modulo.DESCRIZIONI_DEFAULT.values():
+        assert testo in home
+    assert 'id="nota-bicchierino"' in home and 'data-codice="bicchierino"' in home
+    assert 'class="barra-fondo"' not in home                         # nella pagina principale non serve
+    # l'admin cambia la spiegazione di un prodotto (e la può togliere)
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin")
+    with app.app_context():
+        caffe = modulo.prodotto(prod("caffe"))
+    dati = {"_csrf": toka, "nome": caffe["nome"], "emoji": caffe["emoji"], "attivo": "1",
+            "prezzo": f"{caffe['prezzo_cent'] / 100:.2f}".replace(".", ",")}
+    admin.post(f"/admin/prodotto/{caffe['id']}", data={**dati, "descrizione": "Prova   di spiegazione"})
+    assert "Prova di spiegazione" in c.get("/").get_data(as_text=True)
+    admin.post(f"/admin/prodotto/{caffe['id']}", data={**dati, "descrizione": ""})
+    assert "Prova di spiegazione" not in c.get("/").get_data(as_text=True)
+    # barra in basso: Indietro porta alla pagina giusta, Home c'è solo per chi ha fatto l'accesso
+    for url, indietro in (("/saldi", "/"), ("/movimenti", "/"), (f"/persona/{id_di('Giulia')}", "/saldi"),
+                          ("/statistiche", "/")):
+        pagina = c.get(url).get_data(as_text=True)
+        assert f'<a href="{indietro}" class="indietro">' in pagina and 'class="casa"' in pagina, url
+        assert "Torna indietro" not in pagina
+    assert '<a href="/admin/magazzino" class="indietro">' in admin.get("/admin/bilancio").get_data(as_text=True)
+    fuori = app.test_client().get("/come-funziona").get_data(as_text=True)
+    assert '<a href="/accedi" class="indietro">' in fuori and 'class="casa"' not in fuori
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))
