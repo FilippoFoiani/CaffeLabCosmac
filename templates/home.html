@@ -58,6 +58,10 @@
 </section>
 {% endif %}
 
+{% if acqua %}
+<a class="avviso-richieste" href="{{ url_for('admin') }}#acqua">🫗 {{ _("Il conto «{conto}» è a {saldo}: dividi il debito dell'acqua tra chi prende caffè", conto=acqua.conto|nome, saldo=(-acqua.debito)|euro) }} →</a>
+{% endif %}
+
 {% if manutenzioni %}
 <section class="avviso-manutenzione" role="alert">
   <div class="avviso-titolo">🔧 {{ _('Manutenzione della macchinetta da fare') }}</div>

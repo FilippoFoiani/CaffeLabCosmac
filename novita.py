@@ -9,6 +9,15 @@ Chi ha creato l'account dopo quella data non la vede (per lui non è una novità
 
 NOVITA = [
     {
+        "id": "2026-11-12",
+        "it": [
+            "🫗 Il debito dell'acqua della macchinetta ora si divide tra chi prende caffè, in proporzione ai caffè presi. Quando succede ricevi un messaggio con la tua quota.",
+        ],
+        "en": [
+            "🫗 The machine water debt is now split among coffee drinkers, in proportion to the coffees taken. When it happens you get a message with your share.",
+        ],
+    },
+    {
         "id": "2026-11-11f",
         "it": [
             "🗑 Per gli amministratori: dalla scheda di una persona si può eliminare il suo profilo (solo con saldo a 0). Per 3 giorni si può ripristinare.",

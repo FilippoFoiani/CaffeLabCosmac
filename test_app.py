@@ -1290,6 +1290,76 @@ def test_ripristino_da_backup_su_un_server_nuovo():
         shutil.rmtree(nuovo, ignore_errors=True)
 
 
+def test_acqua_della_macchinetta_divisa_tra_chi_prende_caffe():
+    """Issue #10: il debito della Macchinetta del caffè si divide tra le persone attive che hanno preso
+    caffè, in proporzione ai caffè, dopo la conferma di un admin; ognuno riceve un messaggio."""
+    from html import unescape
+    # i centesimi tornano sempre esatti
+    assert modulo.dividi_in_quote(100, [1, 1, 1]) == [34, 33, 33]
+    assert modulo.dividi_in_quote(7, [3, 1]) == [5, 2]
+    assert modulo.dividi_in_quote(0, [2, 5]) == [0, 0] and modulo.dividi_in_quote(50, []) == []
+    assert sum(modulo.dividi_in_quote(1001, [7, 3, 11, 1])) == 1001
+    admin = entra_come_admin()
+    toka, _ = csrf(admin, "/admin")
+    nick = app.test_client()
+    entra(nick, "Nick")
+    tok, html = csrf(nick, "/")                  # un'acqua per la macchinetta in più, così c'è debito
+    nick.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prod('acqua_macchinetta')}": 1})
+    with app.app_context():
+        a = modulo.anteprima_ripartizione()
+        conto = a["conto"]["id"]
+        assert a["debito"] == -modulo.saldo(conto) > 0 and not a["dal"]
+        assert sum(r["quota"] for r in a["righe"]) == a["debito"]
+        assert all(r["persona"]["attivo"] and not r["persona"]["speciale"] for r in a["righe"])
+        eliminati = {r[0] for r in modulo.db().execute("SELECT id FROM persone WHERE eliminato_ts<>''")}
+        assert eliminati and not eliminati & {r["persona"]["id"] for r in a["righe"]}   # profili eliminati: esclusi
+        prima = {r["persona"]["id"]: modulo.saldo(r["persona"]["id"]) for r in a["righe"]}
+    # soglia: con 0,01 € l'avviso compare in home agli admin (non agli altri)
+    admin.post("/admin/acqua/soglia", data={"_csrf": toka, "soglia": "0,01"})
+    assert "dividi il debito dell'acqua" in unescape(admin.get("/").get_data(as_text=True))
+    assert "dividi il debito dell'acqua" not in unescape(nick.get("/").get_data(as_text=True))
+    assert "Anteprima: chi paga quanto" in admin.get("/admin").get_data(as_text=True)
+    # solo un admin divide, e solo confermando i numeri che vede
+    assert nick.post("/admin/acqua/dividi", data={"_csrf": tok}).status_code == 403
+    admin.post("/admin/acqua/dividi", data={"_csrf": toka, "debito": a["debito"] + 1, "caffe": a["caffe"]})
+    with app.app_context():
+        assert modulo.saldo(conto) == -a["debito"]                                  # non è cambiato niente
+    admin.post("/admin/acqua/dividi", data={"_csrf": toka, "debito": a["debito"], "caffe": a["caffe"]})
+    with app.app_context():
+        assert modulo.saldo(conto) == 0
+        for r in a["righe"]:
+            assert modulo.saldo(r["persona"]["id"]) == prima[r["persona"]["id"]] - r["quota"]
+        dopo = modulo.anteprima_ripartizione()
+        assert dopo["debito"] == 0 and dopo["dal"] and not dopo["righe"]           # si riparte da qui
+        pagante = next(r for r in a["righe"] if r["quota"])
+    # chi paga riceve il messaggio con la sua quota; il movimento si legge
+    with app.app_context():
+        testo = modulo.db().execute("""SELECT c.testo FROM comunicazioni c JOIN comunicazioni_destinatari d
+                                       ON d.comunicazione_id = c.id WHERE d.persona_id = ? ORDER BY c.id DESC""",
+                                    (pagante["persona"]["id"],)).fetchone()[0]
+    assert f"ti sono stati addebitati {modulo.euro(pagante['quota'], segno=False)} per i tuoi {pagante['caffe']} caffè" in testo
+    assert "Acqua della macchinetta: quota per" in unescape(admin.get("/movimenti?tutti=1").get_data(as_text=True))
+    # dopo la divisione contano solo i caffè nuovi
+    tok, html = csrf(nick, "/")
+    nick.post("/acquista", data={"_csrf": tok, "nonce": nonce(html), f"q{prod('caffe')}": 2,
+                                 f"q{prod('acqua_macchinetta')}": 1})
+    with app.app_context():
+        nuova = modulo.anteprima_ripartizione()
+        assert [(r["persona"]["id"], r["caffe"]) for r in nuova["righe"]] == [(id_di("Nick"), 2)]
+        assert nuova["righe"][0]["quota"] == nuova["debito"] > 0
+        mid = modulo.db().execute("SELECT id FROM movimenti WHERE tipo='ripartizione' AND persona_id=?",
+                                  (conto,)).fetchone()[0]
+    # annullando la divisione si torna a prima, tutta insieme
+    admin.post(f"/annulla/{mid}", data={"_csrf": toka})
+    with app.app_context():
+        di_nuovo = modulo.anteprima_ripartizione()
+        assert not di_nuovo["dal"] and di_nuovo["debito"] == a["debito"] + nuova["debito"]
+        for r in a["righe"]:
+            assert modulo.saldo(r["persona"]["id"]) == prima[r["persona"]["id"]] - (
+                2 * modulo.prodotto(prod("caffe"))["prezzo_cent"] if r["persona"]["id"] == id_di("Nick") else 0)
+    admin.post("/admin/acqua/soglia", data={"_csrf": toka, "soglia": "3"})
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

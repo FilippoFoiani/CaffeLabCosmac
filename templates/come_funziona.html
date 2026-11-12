@@ -37,7 +37,8 @@
   <ul>
     <li><strong class="pos">{{ _('Saldo positivo') }}</strong> = {{ _('credito: hai messo più soldi di quelli che hai consumato.') }}</li>
     <li><strong class="neg">{{ _('Saldo negativo') }}</strong> = {{ _('debito: hai consumato più di quello che hai pagato.') }}</li>
-    <li>{{ _("Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune «Macchinetta del caffè».") }}</li>
+    <li>{{ _("Caffè e acqua hanno un saldo unico. L'acqua per la macchinetta la paga il conto comune «Macchinetta del caffè».") }}
+      {% if soglia_acqua %}{{ _("Quando il suo debito arriva a {soglia}, un amministratore lo divide tra chi ha preso caffè, in proporzione ai caffè presi: ognuno riceve un messaggio con la sua quota.", soglia=soglia_acqua|euro(false)) }}{% endif %}</li>
     <li>{{ _('Saldi e movimenti sono visibili a tutti, come sul foglio appeso al muro.') }}</li>
   </ul>
 </section>

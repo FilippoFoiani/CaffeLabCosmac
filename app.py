@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS movimenti (
     id             INTEGER PRIMARY KEY,
     ts             TEXT    NOT NULL,              -- UTC, ISO 8601
     persona_id     INTEGER NOT NULL REFERENCES persone(id),
-    tipo           TEXT    NOT NULL,              -- acquisto | trasferimento | spesa | rettifica | iniziale
+    tipo           TEXT    NOT NULL,              -- acquisto | trasferimento | spesa | rettifica | iniziale | ripartizione
     importo_cent   INTEGER NOT NULL,              -- con segno: + credito, - debito
     qta            INTEGER NOT NULL DEFAULT 0,    -- quantità (solo tipo acquisto)
     prodotto_id    INTEGER REFERENCES prodotti(id),
@@ -318,6 +318,8 @@ def inizializza_db():
         con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('backup_esito', '')")
         con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('limite_debito_cent', '0')")
         con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('limite_modo', 'avvisa')")
+        # issue #10: quando il debito dell'acqua della macchinetta arriva qui, gli admin lo dividono
+        con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('ripartizione_soglia_cent', '300')")
         # Promemoria di manutenzione di esempio (una volta sola; l'admin li modifica)
         if con.execute("INSERT OR IGNORE INTO impostazioni VALUES ('manutenzioni_esempio', '1')").rowcount:
             for nome, giorni in MANUTENZIONI_ESEMPIO:
@@ -625,6 +627,10 @@ def descrizione(m):
         return _("Spesa per il gruppo: {cosa}", cosa=_dopo(nota, "Spesa per il gruppo: "))
     if m["tipo"] == "rettifica":
         return _("Rettifica: {motivo}", motivo=_dopo(nota, "Rettifica: "))
+    if m["tipo"] == "ripartizione":     # qta = caffè presi (persona) o persone tra cui è diviso (conto)
+        if m["importo_cent"] > 0:
+            return _("Acqua della macchinetta divisa tra {n} persone", n=m["qta"])
+        return _("Acqua della macchinetta: quota per {n} caffè", n=m["qta"])
     return nota or m["tipo"].capitalize()
 
 
@@ -958,11 +964,13 @@ def home():
         avviso = {"cassa": conto_cassa(), "creditori": creditori(db(), 3),
                   "importo": f"{-mio_saldo / 100:.2f}".replace(".", ","), "oltre_limite": oltre_limite}
     manutenzioni = [m for m in manutenzioni_con_stato() if m["da_fare"]] if u["admin"] else []
+    acqua = anteprima_ripartizione() if u["admin"] else None
     # merce sotto la soglia: lo vedono gli admin e chi è in debito (comprandola rientra)
     da_comprare = articoli_da_comprare() if u["admin"] or mio_saldo < 0 else []
     return render_template("home.html", saldo=mio_saldo, ultimi=ultimi, nomi=nomi, avviso=avviso,
                            manutenzioni=manutenzioni, limite=limite, limite_modo=modo, da_comprare=da_comprare,
                            novita=novita_da_leggere(u), comunicazioni=comunicazioni_da_leggere(u["id"]),
+                           acqua=acqua if acqua and acqua["da_fare"] else None,
                            da_fare=conta_da_fare(u), mie_in_attesa=mie_richieste_in_attesa(u["id"]),
                            prodotti=prodotti(), conti={p["id"]: nome_completo(p)
                                                        for p in elenco_saldi()},
@@ -1523,7 +1531,8 @@ def admin_registro():
 @app.get("/come-funziona")
 def come_funziona():
     limite, modo = limite_debito()
-    return render_template("come_funziona.html", prodotti=prodotti(), limite=limite, limite_modo=modo)
+    return render_template("come_funziona.html", prodotti=prodotti(), limite=limite, limite_modo=modo,
+                           soglia_acqua=soglia_ripartizione())
 
 
 # --------------------------------------------------------------------------
@@ -2028,7 +2037,7 @@ def admin():
                            n_da_approvare=conta_da_fare(g.utente),
                            comunicazioni=comunicazioni_admin(), max_testo=MAX_TESTO_COMUNICAZIONE,
                            destinatarie=persone_destinatarie(), scelto=request.args.get("a", type=int),
-                           eliminati=profili_eliminati(),
+                           eliminati=profili_eliminati(), acqua=anteprima_ripartizione(),
                            n_con_accesso=sum(1 for p in righe if p["attivo"] and not p["speciale"]
                                              and p["pin_hash"] and p["approvato"]),
                            n_senza_email=sum(1 for p in persone_neg if not p["email"]),
@@ -2090,6 +2099,117 @@ def admin_manutenzione(mid):
                      (nome, giorni, ultima, 1 if request.form.get("attivo") else 0, mid))
     flash(_("Promemoria aggiornato: {nome}.", nome=nome), "ok")
     return redirect(url_for("admin"))
+
+
+# --------------------------------------------------------------------------
+# Acqua della macchinetta (issue #10): l'acqua del serbatoio la paga il conto comune
+# «Macchinetta del caffè». Quando il suo debito arriva alla soglia, un admin lo divide tra le
+# persone attive che hanno preso caffè, in proporzione ai caffè presi dall'ultima divisione.
+# --------------------------------------------------------------------------
+def conto_macchinetta():
+    r = db().execute("SELECT addebito_id FROM prodotti WHERE codice='acqua_macchinetta' "
+                     "AND addebito_id IS NOT NULL").fetchone()
+    return persona(r["addebito_id"]) if r else None
+
+
+def soglia_ripartizione():
+    try:
+        return max(0, int(impostazione("ripartizione_soglia_cent", "300")))
+    except ValueError:
+        return 300
+
+
+def dividi_in_quote(totale, pesi):
+    """Divide «totale» centesimi in proporzione ai pesi; i centesimi che avanzano dagli
+    arrotondamenti vanno a chi ha il resto più grande, così la somma torna sempre esatta."""
+    somma = sum(pesi)
+    if totale <= 0 or not somma:
+        return [0] * len(pesi)
+    quote = [totale * p // somma for p in pesi]
+    ordine = sorted(range(len(pesi)), key=lambda i: (-(totale * pesi[i] % somma), -pesi[i], i))
+    for i in ordine[:totale - sum(quote)]:
+        quote[i] += 1
+    return quote
+
+
+def anteprima_ripartizione():
+    """Chi pagherebbe quanto se si dividesse adesso il debito della Macchinetta del caffè."""
+    conto = conto_macchinetta()
+    if not conto:
+        return None
+    debito = max(0, -saldo(conto["id"]))
+    # l'ultima divisione valida fa da confine: si usa l'id (cresce sempre), non l'ora, che ha i secondi
+    ultima = db().execute("SELECT id, ts FROM movimenti WHERE tipo='ripartizione' AND persona_id=? "
+                          "AND annullato=0 ORDER BY id DESC LIMIT 1", (conto["id"],)).fetchone()
+    dal = ultima["ts"] if ultima else ""
+    righe = db().execute("""
+        SELECT p.*, SUM(m.qta) AS caffe FROM movimenti m
+        JOIN persone p ON p.id = m.persona_id JOIN prodotti pr ON pr.id = m.prodotto_id
+        WHERE m.tipo = 'acquisto' AND m.annullato = 0 AND pr.codice = 'caffe' AND m.id > ?
+          AND p.attivo = 1 AND p.speciale = 0 AND p.eliminato_ts = ''
+        GROUP BY p.id HAVING SUM(m.qta) > 0
+        ORDER BY LOWER(p.nome), LOWER(p.cognome)""", (ultima["id"] if ultima else 0,)).fetchall()
+    quote = dividi_in_quote(debito, [r["caffe"] for r in righe])
+    soglia = soglia_ripartizione()
+    return {"conto": conto, "debito": debito, "dal": dal, "soglia": soglia,
+            "righe": [{"persona": r, "caffe": r["caffe"], "quota": q} for r, q in zip(righe, quote)],
+            "caffe": sum(r["caffe"] for r in righe),
+            "si_puo": debito > 0 and bool(righe),
+            "da_fare": debito > 0 and bool(righe) and bool(soglia) and debito >= soglia}
+
+
+def testo_quota_acqua(p, quota, caffe, debito, conto, dal):
+    """Messaggio a chi paga una quota, nella sua lingua."""
+    lingua = p["lingua"] if p["lingua"] in LINGUE else "it"
+    valori = {"quota": euro(quota, segno=False), "n": caffe, "debito": euro(debito, segno=False),
+              "conto": nome_completo(conto)}
+    if dal:
+        valori["data"] = f"{da_iso(dal).astimezone(TZ):%d/%m}"
+        return traduci("☕ Acqua della macchinetta: ti sono stati addebitati {quota} per i tuoi {n} caffè dal {data}. "
+                       "Il debito del conto «{conto}» ({debito}) è stato diviso tra chi prende caffè.", lingua, **valori)
+    return traduci("☕ Acqua della macchinetta: ti sono stati addebitati {quota} per i tuoi {n} caffè. "
+                   "Il debito del conto «{conto}» ({debito}) è stato diviso tra chi prende caffè.", lingua, **valori)
+
+
+@app.post("/admin/acqua/dividi")
+@admin_richiesto
+def admin_acqua_dividi():
+    a = anteprima_ripartizione()
+    if not a or not a["si_puo"]:
+        flash(_("Non c'è niente da dividere: il conto non ha debito o nessuno ha preso caffè."), "errore")
+        return redirect(url_for("admin") + "#acqua")
+    # l'admin ha confermato l'anteprima che vedeva: se nel frattempo è cambiata, la ricontrolla
+    if request.form.get("debito", type=int) != a["debito"] or request.form.get("caffe", type=int) != a["caffe"]:
+        flash(_("Nel frattempo i numeri sono cambiati: controlla di nuovo l'anteprima e conferma."), "errore")
+        return redirect(url_for("admin") + "#acqua")
+    conto, u, gruppo = a["conto"], g.utente, uuid.uuid4().hex
+    paganti = [r for r in a["righe"] if r["quota"]]
+    with db():
+        for r in paganti:
+            registra(r["persona"]["id"], "ripartizione", -r["quota"], qta=r["caffe"], controparte_id=conto["id"],
+                     gruppo=gruppo, nota=f"Acqua macchinetta: quota per {r['caffe']} caffè", creato_da=u["id"])
+        registra(conto["id"], "ripartizione", sum(r["quota"] for r in paganti), qta=len(paganti), gruppo=gruppo,
+                 nota=f"Acqua macchinetta divisa tra {len(paganti)} persone", creato_da=u["id"])
+        for r in paganti:
+            invia_messaggio(testo_quota_acqua(r["persona"], r["quota"], r["caffe"], a["debito"], conto, a["dal"]),
+                            [r["persona"]["id"]], autore_id=u["id"])
+    flash(_("Debito dell'acqua diviso: {debito} tra {n} persone. Ognuno ha ricevuto un messaggio con la sua quota.",
+            debito=euro(a["debito"], segno=False), n=len(paganti)), "ok")
+    return redirect(url_for("admin") + "#acqua")
+
+
+@app.post("/admin/acqua/soglia")
+@admin_richiesto
+def admin_acqua_soglia():
+    testo = request.form.get("soglia", "").strip()
+    cent = leggi_euro(testo, consenti_zero=True)
+    if cent is None:
+        flash(_("Soglia non valida (es. 3 oppure 2,50; 0 = nessun avviso)."), "errore")
+    else:
+        with db():
+            imposta("ripartizione_soglia_cent", str(cent))
+        flash(_("Soglia aggiornata: {soglia}.", soglia=euro(cent, segno=False)), "ok")
+    return redirect(url_for("admin") + "#acqua")
 
 
 @app.post("/admin/limite")

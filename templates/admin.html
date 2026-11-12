@@ -58,6 +58,40 @@
   {% endif %}
 </section>
 
+{% if acqua %}
+<section class="scheda" id="acqua">
+  <h2>🫗 {{ _('Acqua della macchinetta') }}</h2>
+  <p class="aiuto">{{ _("L'acqua per la macchinetta la paga il conto «{conto}». Quando il suo debito arriva alla soglia, dividilo tra le persone attive che hanno preso caffè, in proporzione a quanti ne hanno presi dall'ultima divisione. Ognuno riceve un messaggio con la sua quota.", conto=acqua.conto|nome) }}</p>
+  <p>{{ _('Debito del conto adesso:') }} <strong class="{% if acqua.debito %}neg{% endif %}">{{ (-acqua.debito)|euro }}</strong>
+    · {{ _('caffè contati: {n}', n=acqua.caffe) }}
+    · {% if acqua.dal %}{{ _("dall'ultima divisione ({data})", data=acqua.dal|ora) }}{% else %}{{ _("da quando c'è l'app") }}{% endif %}</p>
+  {% if acqua.righe and acqua.debito %}
+  <details {% if acqua.da_fare %}open{% endif %}>
+    <summary>{{ _('Anteprima: chi paga quanto') }}</summary>
+    <ul class="lista">
+      {% for r in acqua.righe %}
+      <li><div>{{ r.persona|nome }} <span class="piccolo">· {{ _('{n} caffè', n=r.caffe) }}</span></div><div class="importo neg">{{ (-r.quota)|euro }}</div></li>
+      {% endfor %}
+    </ul>
+  </details>
+  <form method="post" action="{{ url_for('admin_acqua_dividi') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="debito" value="{{ acqua.debito }}">
+    <input type="hidden" name="caffe" value="{{ acqua.caffe }}">
+    <button type="submit" class="btn" data-conferma="{{ _("Dividere {debito} tra {n} persone come nell'anteprima?", debito=acqua.debito|euro(false), n=acqua.righe|length) }}">🫗 {{ _('Dividi adesso') }}</button>
+  </form>
+  {% else %}
+  <p class="aiuto">{{ _("Per ora non c'è niente da dividere.") }}</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin_acqua_soglia') }}" class="modulo in-linea">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input name="soglia" inputmode="decimal" value="{{ '%.2f'|format(acqua.soglia / 100)|replace('.', ',') }}" aria-label="{{ _('Soglia in euro') }}">
+    <button type="submit" class="btn secondario">{{ _('Salva la soglia') }}</button>
+  </form>
+  <p class="piccolo">{{ _('Alla soglia gli amministratori vedono un avviso in home. 0 = nessun avviso. Una divisione sbagliata si annulla tutta da «Tutti i movimenti».') }}</p>
+</section>
+{% endif %}
+
 <section class="scheda" id="limite">
   <h2>🚫 {{ _('Limite di debito') }}</h2>
   <p class="aiuto">{{ _('Chi supera il limite vede un avviso fisso in cima alla pagina. Puoi scegliere se gli acquisti oltre il limite vengono bloccati o se basta una conferma. 0 = nessun limite.') }}</p>
