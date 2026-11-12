@@ -98,6 +98,8 @@ os.environ["CAFFE_SMTP_PASSWORD"] = "abcd efgh ijkl mnop"   # la password per le
 
 Ognuno inserisce la propria email al primo accesso o dal **Profilo** (e lì può anche disattivare l'avviso per email). Chi non mette l'email vede comunque l'avviso nell'app.
 
+**Cosa c'è nell'email.** Il saldo, i tre modi per rientrare e l'**elenco di tutti quelli in credito**, dal credito più alto, ognuno con il suo credito e il link alla sua **scheda** nell'app. Dalla scheda si vede come vuole essere pagato: PayPal e IBAN non sono scritti nell'email, si vedono solo dopo l'accesso. Se il telefono non ha già fatto l'accesso, dopo il PIN si arriva direttamente su quella scheda. I link partono dall'indirizzo di `CAFFE_URL`: per questo va impostato.
+
 **Quando partono le email.** Il piano gratuito di PythonAnywhere non ha più le attività pianificate per gli account nuovi, quindi l'app manda le email da sola alla **prima pagina aperta da qualcuno dopo lunedì alle 8:00** (in pratica: il primo caffè del lunedì). Partono una sola volta a settimana.
 Se vuoi un orario preciso anche quando nessuno apre l'app: aggiungi nel file WSGI `os.environ["CAFFE_CRON_TOKEN"] = "una-parola-segreta-lunga"` e fai chiamare ogni lunedì alle 8:30 l'indirizzo `https://INDIRIZZO/cron/avvisi?token=una-parola-segreta-lunga` da un servizio gratuito di cron online (per esempio cron-job.org).
 
@@ -158,7 +160,7 @@ PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, nella tua scheda: si 
   Si può nascondere fino al lunedì successivo con «Ho capito».
 - **Profilo ed email**: la propria email per ricevere l'avviso anche per posta, e (facoltativi) **PayPal** e **IBAN** per dire come si vuole essere pagati. Come si imposta: vedi il passo 6 qui sopra.
 - **Novità e comunicazioni**: dopo ogni aggiornamento in home compare il riquadro blu **«Novità dell'aggiornamento»** con le novità in breve: si spunta **Ho letto** e sparisce fino all'aggiornamento successivo. Le comunicazioni degli amministratori compaiono allo stesso modo in un riquadro viola 📣, una per volta, ognuna con la sua spunta.
-- **Scheda della persona**: toccando un nome in *Saldi di tutti* (o tra chi è in credito nell'avviso del lunedì) si apre la sua scheda con nome, cognome, saldo e come vuole essere pagato. In *Pagamenti tra persone* la scheda compare da sola appena si sceglie la persona. PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, e non finiscono nell'Excel.
+- **Scheda della persona**: toccando un nome in *Saldi di tutti* (o tra chi è in credito nell'avviso del lunedì, nell'app o dal link nell'email) si apre la sua scheda con nome, cognome, saldo e come vuole essere pagato. In *Pagamenti tra persone* la scheda compare da sola appena si sceglie la persona. PayPal e IBAN li vede solo chi ha fatto l'accesso all'app, e non finiscono nell'Excel.
 - **Lingua**: in alto a destra ci sono **IT / EN**. La scelta resta salvata per ogni persona (anche le email del lunedì arrivano nella sua lingua); al primo accesso l'app usa la lingua del telefono. Il cartello con il QR è in italiano e in inglese.
 - **Dopo ogni caffè** compare: «Ricorda di lasciare pulito dopo aver consumato il caffè!».
 - Chi ha dimenticato il PIN o ha cambiato telefono: l'amministratore lo azzera dalla sua scheda.

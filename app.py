@@ -721,6 +721,8 @@ def login_richiesto(f):
     @wraps(f)
     def wrapper(*a, **kw):
         if not g.utente:
+            if request.method == "GET" and not g.get("in_attesa"):
+                session["dopo_accesso"] = request.full_path.rstrip("?")
             return redirect(url_for("attesa" if g.get("in_attesa") else "accedi"))
         return f(*a, **kw)
     return wrapper
@@ -737,13 +739,21 @@ def admin_richiesto(f):
 
 
 def apri_sessione(p):
-    lingua = session.get("lingua")
+    lingua, dopo = session.get("lingua"), session.get("dopo_accesso")
     session.clear()
     if lingua:
         session["lingua"] = lingua
+    if dopo:
+        session["dopo_accesso"] = dopo
     session.permanent = True
     session["uid"] = p["id"]
     session["ver"] = p["versione_sessione"]
+
+
+def pagina_dopo_accesso():
+    """Dove andare appena fatto l'accesso: la pagina chiesta prima (solo indirizzi interni), se no la home."""
+    dopo = session.pop("dopo_accesso", "")
+    return dopo if dopo.startswith("/") and not dopo.startswith(("//", "/\\")) else url_for("home")
 
 
 def pin_valido(pin):
@@ -781,7 +791,7 @@ def accedi():
                 db().execute("UPDATE persone SET tentativi=0, bloccato_fino=NULL WHERE id=?",
                              (p["id"],))
             apri_sessione(p)
-            return redirect(url_for("home" if p["approvato"] else "attesa"))
+            return redirect(pagina_dopo_accesso() if p["approvato"] else url_for("attesa"))
         tentativi = p["tentativi"] + 1
         blocco = None
         if tentativi >= MAX_TENTATIVI_PIN:
@@ -1648,16 +1658,24 @@ def saldi_persone(con):
         GROUP BY p.id""").fetchall()
 
 
-def creditori(con, n=3):
-    righe = [r for r in saldi_persone(con) if r["saldo"] > 0]
-    return sorted(righe, key=lambda r: -r["saldo"])[:n]
+def creditori(con, n=None):
+    """Chi è in credito, dal credito più alto; n = quanti al massimo (None = tutti)."""
+    righe = sorted((r for r in saldi_persone(con) if r["saldo"] > 0), key=lambda r: -r["saldo"])
+    return righe if n is None else righe[:n]
+
+
+def link_scheda(indirizzo, p):
+    return f"{indirizzo.rstrip('/')}/persona/{p['id']}"
 
 
 def testo_email_avviso(p, cred, indirizzo):
     lingua = p["lingua"] if p["lingua"] in LINGUE else "it"
     t = lambda chiave, /, **kw: traduci(chiave, lingua, **kw)
-    righe_cred = ", ".join(f"{nome_completo(c)} ({euro(c['saldo'])})" for c in cred) \
-        or t("nessuno al momento")
+    if cred:   # tutti quelli in credito, uno per riga, con il link alla scheda (PayPal e IBAN solo nell'app)
+        righe_cred = [t("  in «Pagamenti tra persone». Chi è in credito ora (dal link vedi come vuole essere pagato):")]
+        righe_cred += [f"    • {nome_completo(c)}: {euro(c['saldo'])} – {link_scheda(indirizzo, c)}" for c in cred]
+    else:
+        righe_cred = [t("  in «Pagamenti tra persone». In credito ora: {elenco}.", elenco=t("nessuno al momento"))]
     oggetto = t("{app}: il tuo saldo è {saldo}", app=NOME_APP, saldo=euro(p["saldo"]))
     corpo = "\n".join([
         t("Ciao {nome},", nome=p["nome"]), "",
@@ -1666,7 +1684,7 @@ def testo_email_avviso(p, cred, indirizzo):
         t("- Salda il debito: versa i soldi nella cassa e registralo nell'app"),
         t("  (Pagamenti tra persone → «Ho dato dei soldi a qualcuno» → Cassa)."),
         t("- Compra il credito di un altro utente: dai i soldi a chi è in credito e registralo"),
-        t("  in «Pagamenti tra persone». In credito ora: {elenco}.", elenco=righe_cred),
+        *righe_cred,
         t("- Compra uno dei beni: compra caffè, acqua o altro per il gruppo e registralo"),
         t("  in «Ho comprato per il gruppo»."), "",
         t("Apri l'app: {url}", url=indirizzo), "",
@@ -1705,7 +1723,7 @@ def anteprima_avvisi(con, indirizzo):
     """Chi è in negativo e cosa riceverebbe adesso, senza spedire nulla.
     Ogni voce: persona, saldo, email, motivo ('' = la riceve, 'senza_email', 'disattivato'),
     oggetto e corpo dell'email (anche per chi non la riceve, per vedere il testo)."""
-    cred = creditori(con, 3)
+    cred = creditori(con)
     voci = []
     for p in sorted((p for p in saldi_persone(con) if p["saldo"] < 0), key=lambda p: p["saldo"]):
         motivo = "" if p["email"] and p["avvisi_email"] else \
@@ -2241,7 +2259,7 @@ def admin_avvisi_prova():
     else:
         prova = dict(u)
         prova["saldo"] = saldo(u["id"]) if saldo(u["id"]) < 0 else -420
-        oggetto, corpo = testo_email_avviso(prova, creditori(db(), 3),
+        oggetto, corpo = testo_email_avviso(prova, creditori(db()),
                                             os.environ.get("CAFFE_URL") or url_for("home", _external=True))
         try:
             n, errori = spedisci([(u["email"], "[PROVA] " + oggetto, corpo)])

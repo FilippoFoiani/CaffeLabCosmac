@@ -577,6 +577,8 @@ EN = {
         "- Buy another user's credit: give the money to someone in credit and record it",
     "  in «Pagamenti tra persone». In credito ora: {elenco}.":
         "  in “Payments between people”. In credit now: {elenco}.",
+    "  in «Pagamenti tra persone». Chi è in credito ora (dal link vedi come vuole essere pagato):":
+        "  in “Payments between people”. In credit now (the link shows how they want to be paid):",
     "- Compra uno dei beni: compra caffè, acqua o altro per il gruppo e registralo":
         "- Buy one of the goods: buy coffee, water or anything else for the group and record it",
     "  in «Ho comprato per il gruppo».": "  in “I bought for the group”.",

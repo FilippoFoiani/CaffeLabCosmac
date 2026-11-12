@@ -515,7 +515,8 @@ def test_prova_a_secco_avvisi(monkeypatch):
     assert "riceve l'email" in lorenzo and "lorenzo@studenti.unipg.it" in lorenzo
     assert modulo.TESTO_AVVISO in lorenzo and "−1,50 €" in lorenzo  # il testo dell'email
     assert "senza email" in pagina[pagina.index("Lupi"):].split("</li>")[0]
-    assert "Vittorio" not in pagina                                # in positivo: non compare
+    assert '<div class="forte">Vittorio' not in pagina             # in positivo: non la riceve
+    assert "• Vittorio Test: +" in pagina                          # ma compare tra chi è in credito
     with app.app_context():
         voci = {v["nome"].split()[0]: v for v in modulo.anteprima_avvisi(modulo.db(), "https://x/")}
         assert voci["Lorenzo"]["motivo"] == "" and voci["Lupi"]["motivo"] == "senza_email"
@@ -614,6 +615,49 @@ def test_email_in_inglese():
     oggetto, corpo = modulo.testo_email_avviso(p, [], "https://x/")
     assert "your balance is" in oggetto
     assert "SETTLE YOUR DEBT" in corpo and "Hi Nick," in corpo
+
+
+def test_email_del_lunedi_elenca_tutti_i_creditori():
+    """Issue #13: nell'email tutti quelli in credito, uno per riga, con il link alla scheda (niente IBAN/PayPal)."""
+    with app.app_context():
+        con = modulo.db()
+        cred = modulo.creditori(con)
+        in_credito = con.execute("""SELECT COUNT(*) FROM (SELECT p.id FROM persone p JOIN movimenti m
+                                    ON m.persona_id = p.id AND m.annullato = 0
+                                    WHERE p.attivo = 1 AND p.speciale = 0
+                                    GROUP BY p.id HAVING SUM(m.importo_cent) > 0)""").fetchone()[0]
+        assert len(cred) == in_credito > 3                                  # non più solo i primi 3
+        assert [c["saldo"] for c in cred] == sorted((c["saldo"] for c in cred), reverse=True)
+        assert len(modulo.creditori(con, 3)) == 3                            # il riquadro in home ne mostra 3
+        p = dict(con.execute("SELECT * FROM persone WHERE nome='Nick'").fetchone())
+        con.execute("UPDATE persone SET iban='IT60X0542811101000000123456' WHERE id=?", (cred[0]["id"],))
+        con.commit()
+        cred = modulo.creditori(con)
+    p["saldo"], p["lingua"] = -500, "it"
+    _o, corpo = modulo.testo_email_avviso(p, cred, "https://caffe.example/")
+    for c in cred:
+        assert f"• {modulo.nome_completo(c)}: {modulo.euro(c['saldo'])} – https://caffe.example/persona/{c['id']}" in corpo
+    assert "IT60X0542811101000000123456" not in corpo and "IBAN" not in corpo
+    assert "dal link vedi come vuole essere pagato" in corpo
+    _o, corpo = modulo.testo_email_avviso(p, [], "https://caffe.example")
+    assert "In credito ora: nessuno al momento." in corpo and "/persona/" not in corpo
+    p["lingua"] = "en"
+    _o, corpo = modulo.testo_email_avviso(p, cred, "https://caffe.example")
+    assert "the link shows how they want to be paid" in corpo and f"https://caffe.example/persona/{cred[0]['id']}" in corpo
+    # chi apre il link senza aver fatto l'accesso, dopo il PIN arriva proprio sulla scheda
+    entra(app.test_client(), "Nick")                     # (account già attivato)
+    c = app.test_client()
+    r = c.get(f"/persona/{cred[0]['id']}")
+    assert r.status_code == 302 and "/accedi" in r.headers["Location"]
+    r = entra(c, "Nick")
+    assert r.headers["Location"].endswith(f"/persona/{cred[0]['id']}")
+    import html as _h
+    assert modulo.nome_completo(cred[0]) in _h.unescape(c.get(r.headers["Location"]).get_data(as_text=True))
+    # senza una pagina chiesta prima si va alla home come sempre
+    assert "/persona/" not in entra(app.test_client(), "Nick").headers["Location"]
+    with app.app_context():
+        modulo.db().execute("UPDATE persone SET iban='' WHERE id=?", (cred[0]["id"],))
+        modulo.db().commit()
 
 
 def test_traduzioni_complete():
