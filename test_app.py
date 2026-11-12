@@ -1249,6 +1249,47 @@ def test_eliminare_un_profilo():
     assert j.post(f"/admin/persona/{id_di('Nick')}/elimina", data={"_csrf": tok}).status_code in (302, 403)
 
 
+def test_ripristino_da_backup_su_un_server_nuovo():
+    """Issue #12: «gestione.py ripristina» rimette tutti i dati di un backup .db su un server nuovo."""
+    import sqlite3
+    nuovo = tempfile.mkdtemp(prefix="caffe_nuovo_server_")
+    dati = os.path.join(nuovo, "dati")
+    try:
+        backup = os.path.join(nuovo, "caffe_backup.db")
+        with app.app_context():
+            with open(backup, "wb") as f:
+                f.write(modulo.copia_database(modulo.db()))
+            conta = {t: modulo.db().execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                     for t in ("persone", "movimenti", "richieste", "magazzino", "comunicazioni")}
+            pin = modulo.persona(id_di("Filippo"))["pin_hash"]
+        env = {**os.environ, "CAFFE_DATA_DIR": dati, "PYTHONUTF8": "1"}
+
+        def ripristina(*argomenti, risposta=""):
+            r = subprocess.run([sys.executable, os.path.join(QUI, "gestione.py"), "ripristina", *argomenti],
+                               input=risposta, capture_output=True, text=True, env=env, cwd=QUI)
+            return r.returncode, r.stdout + r.stderr
+        # un file che non è un database viene rifiutato; senza «SI» non cambia niente
+        sbagliato = os.path.join(nuovo, "non_un_db.db")
+        with open(sbagliato, "w") as f:
+            f.write("ciao")
+        codice, testo = ripristina(sbagliato, "--si")
+        assert codice != 0 and "Non è un database valido" in testo
+        codice, testo = ripristina(backup, risposta="no\n")
+        assert codice != 0 and "Annullato" in testo
+        # ripristinato: stessi dati, stessi PIN
+        codice, testo = ripristina(backup, "--si")
+        assert codice == 0 and "Fatto" in testo, testo
+        con = sqlite3.connect(os.path.join(dati, "caffe.db"))
+        assert {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in conta} == conta
+        assert con.execute("SELECT pin_hash FROM persone WHERE id=?", (id_di("Filippo"),)).fetchone()[0] == pin
+        con.close()
+        # una seconda volta c'erano già dati: prima ne salva una copia di sicurezza
+        codice, testo = ripristina(backup, "--si")
+        assert codice == 0 and any(f.startswith("caffe_prima_del_ripristino_") for f in os.listdir(dati))
+    finally:
+        shutil.rmtree(nuovo, ignore_errors=True)
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

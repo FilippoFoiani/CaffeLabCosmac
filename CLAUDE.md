@@ -17,7 +17,7 @@ pip install -r requirements.txt          # Flask, openpyxl, segno (QR), tzdata
 python3 app.py                           # dev server on http://localhost:5000; creates admin "root", PIN 0000 (CAFFE_ROOT_PIN / CAFFE_ROOT=0)
 python3 -m pytest -q                     # all tests (pytest is not in requirements.txt)
 python3 -m pytest -q test_app.py::test_spesa   # a single test
-python3 gestione.py                      # console admin commands: importa | elenco | admin <id> | reset-pin <id> | avvisi
+python3 gestione.py                      # console admin commands: importa | elenco | admin <id> | reset-pin <id> | avvisi | ripristina <backup.db>
 ```
 
 No linter or build step is configured. GitHub Actions (`.github/workflows/test.yml`) runs the whole test suite on every push and pull request, on Python 3.12 (the PythonAnywhere version) and 3.14.

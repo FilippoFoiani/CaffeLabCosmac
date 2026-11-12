@@ -8,13 +8,18 @@ Comandi di gestione da lanciare nella console (Bash) del server.
   python3 gestione.py avvisi                       manda le email del lunedì (una volta a settimana)
   python3 gestione.py avvisi-prova                 prova a secco: chi le riceverebbe e il testo, senza spedire
   python3 gestione.py avvisi-prova tu@esempio.it   manda solo a quell'indirizzo una copia [PROVA] dell'avviso
+  python3 gestione.py ripristina caffe_backup.db   rimette tutti i dati da un backup .db (es. cambio di provider)
 """
 import os
 import csv
+import sqlite3
 import sys
+from datetime import datetime
+from pathlib import Path
 
+import app as modulo_app
 from app import (NOME_APP, SMTP_USER, adesso, anteprima_avvisi, app, connetti, email_configurata, euro,
-                 invia_avvisi, leggi_euro, spedisci)
+                 invia_avvisi, leggi_euro, ora_locale, spedisci)
 
 
 def importa(percorso):
@@ -130,6 +135,69 @@ def reset_pin(pid):
     print("PIN azzerato." if n else "Id non trovato.")
 
 
+TABELLE_NECESSARIE = {"persone", "movimenti", "prodotti", "impostazioni"}
+
+
+def controlla_backup(percorso):
+    """Apre il backup in sola lettura e controlla che sia un database di Caffè Lab integro.
+    Restituisce un riassunto (dizionario) oppure esce con un messaggio chiaro."""
+    file = Path(percorso)
+    if not file.is_file():
+        raise SystemExit(f"File non trovato: {percorso}")
+    try:
+        con = sqlite3.connect(file.resolve().as_uri() + "?mode=ro", uri=True)
+        con.row_factory = sqlite3.Row
+        esito = con.execute("PRAGMA integrity_check").fetchone()[0]
+        tabelle = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    except sqlite3.DatabaseError as e:
+        raise SystemExit(f"Non è un database valido ({e}). Usa il file caffe_backup_….db del backup.")
+    if esito != "ok":
+        raise SystemExit(f"Il database è rovinato (controllo: {esito}). Prova con un backup precedente.")
+    mancano = TABELLE_NECESSARIE - tabelle
+    if mancano:
+        raise SystemExit(f"Non sembra un backup di {NOME_APP}: mancano le tabelle {', '.join(sorted(mancano))}.")
+    riassunto = {
+        "persone": con.execute("SELECT COUNT(*) FROM persone WHERE speciale=0").fetchone()[0],
+        "admin": con.execute("SELECT COUNT(*) FROM persone WHERE speciale=0 AND admin=1").fetchone()[0],
+        "movimenti": con.execute("SELECT COUNT(*) FROM movimenti").fetchone()[0],
+        "ultimo": con.execute("SELECT MAX(ts) FROM movimenti").fetchone()[0],
+    }
+    con.close()
+    return riassunto
+
+
+def ripristina(percorso, conferma=False):
+    """Sostituisce il database dell'app con un backup .db (cambio di provider o database rovinato).
+    Prima salva una copia di sicurezza di quello attuale, se contiene dati; dopo aggiorna le tabelle
+    alla versione dell'app, come fa un riavvio."""
+    db_path = Path(modulo_app.DB_PATH)
+    if Path(percorso).resolve() == db_path.resolve():
+        raise SystemExit("Questo è già il database in uso: indica il file del backup.")
+    r = controlla_backup(percorso)
+    ultimo = ora_locale(r["ultimo"]) if r["ultimo"] else "nessuno"
+    print(f"Backup: {percorso}")
+    print(f"  {r['persone']} persone ({r['admin']} amministratori), {r['movimenti']} movimenti, ultimo movimento: {ultimo}")
+    attuale = connetti()
+    persone_ora = attuale.execute("SELECT COUNT(*) FROM persone WHERE speciale=0").fetchone()[0]
+    if persone_ora:
+        print(f"ATTENZIONE: il database attuale ({db_path}) ha già {persone_ora} persone: verrà sostituito.")
+    if not conferma and input("Scrivi SI per sostituire i dati con quelli del backup: ").strip().upper() != "SI":
+        attuale.close()
+        raise SystemExit("Annullato: non è cambiato niente.")
+    if persone_ora:      # copia di sicurezza di quello che c'era, nella stessa cartella dati/
+        copia = db_path.with_name(f"caffe_prima_del_ripristino_{datetime.now():%Y-%m-%d_%H%M%S}.db")
+        dest = sqlite3.connect(copia)
+        attuale.backup(dest)
+        dest.close()
+        print(f"Copia di sicurezza del database di prima: {copia}")
+    sorgente = sqlite3.connect(Path(percorso).resolve().as_uri() + "?mode=ro", uri=True)
+    sorgente.backup(attuale)          # copia pagina per pagina, anche se l'app è accesa
+    sorgente.close()
+    attuale.close()
+    modulo_app.inizializza_db()       # un backup vecchio prende le tabelle e le colonne nuove
+    print("Fatto: dati ripristinati. Ora riavvia la web app (su PythonAnywhere: touch /var/www/*_wsgi.py).")
+
+
 if __name__ == "__main__":
     with app.app_context():
         args = sys.argv[1:]
@@ -150,5 +218,7 @@ if __name__ == "__main__":
             prova_avvisi()
         elif len(args) == 2 and args[0] == "avvisi-prova" and "@" in args[1]:
             prova_avvisi(args[1])
+        elif len(args) in (2, 3) and args[0] == "ripristina" and args[2:] in ([], ["--si"]):
+            ripristina(args[1], conferma=args[2:] == ["--si"])
         else:
             print(__doc__)

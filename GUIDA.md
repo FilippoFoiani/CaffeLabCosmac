@@ -212,13 +212,33 @@ Serve solo se l'account PythonAnywhere si perde o il database si rovina.
 3. **Consoles → Bash** (cambia la data con quella del tuo file):
 
 ```bash
-mkdir -p ~/caffe-lab/dati
-mv ~/caffe_backup_2026-11-16.db ~/caffe-lab/dati/caffe.db
+cd ~/caffe-lab
+python3.12 gestione.py ripristina ~/caffe_backup_2026-11-16.db
 touch /var/www/*_wsgi.py && echo "OK: ripristinato"
 ```
 
+   `gestione.py ripristina` controlla che il file sia un backup integro di Caffè Lab, mostra quante persone e movimenti contiene e chiede di scrivere **SI**. Se nel database attuale ci sono già dati, prima ne salva una copia di sicurezza in `dati/` (`caffe_prima_del_ripristino_….db`). Un backup di una versione più vecchia viene aggiornato da solo.
+
 4. Apri l'app: saldi, movimenti, persone, PIN e amministratori sono come al momento del backup. Se l'account è nuovo, ognuno rientra una volta con nome e PIN.
 5. Se l'indirizzo è cambiato (nuovo nome utente), aggiorna `CAFFE_URL` nel file WSGI e ristampa il QR.
+
+### Cambiare provider (portare l'app su un altro server)
+
+Il **backup `.db` contiene tutto**: persone, PIN, amministratori, saldi, movimenti, prodotti, magazzino, comunicazioni e impostazioni. È un file SQLite: funziona su qualsiasi server con Python 3.12 e un disco dove salvarlo (un altro PythonAnywhere, un server o VPS, un servizio con disco persistente). Non serve convertire niente.
+
+1. **Sul vecchio server**, all'ultimo momento utile: *Amministrazione → Backup* e scarica il file `.db` (oppure prendi quello dell'ultima email del lunedì). Da qui in poi nessuno deve più segnare niente sul vecchio indirizzo, altrimenti quei movimenti non arrivano sul nuovo.
+2. **Sul nuovo server** installa il codice: carica lo zip della Release (o il contenuto della repository) in una cartella, per esempio `~/caffe-lab`, poi `pip install -r requirements.txt`.
+3. Imposta l'avvio dell'app: il server deve caricare `app` dal file `app.py` (`from app import app as application` per WSGI, come al passo 3) e le variabili d'ambiente: `CAFFE_HTTPS=1`, `CAFFE_URL` con il **nuovo indirizzo**, e per le email `CAFFE_SMTP_USER` e `CAFFE_SMTP_PASSWORD` (vedi il passo 4).
+4. Carica il file `.db` e rimettilo con:
+   ```bash
+   cd ~/caffe-lab
+   python3 gestione.py ripristina /percorso/del/caffe_backup_AAAA-MM-GG.db
+   ```
+   Scrivi **SI** quando lo chiede, poi riavvia l'app.
+5. Apri il nuovo indirizzo ed entra: ognuno rientra una volta con nome e **lo stesso PIN** di prima.
+6. Con il nuovo indirizzo **ristampa il QR** (*Amministrazione → QR code*) e attaccalo alla macchinetta al posto del vecchio. Manda a tutti il nuovo link, per esempio con una comunicazione dal vecchio server prima di chiuderlo.
+
+Non vanno portati il file `dati/secret_key` (se manca l'app ne crea uno nuovo: l'unico effetto è che tutti rientrano con il PIN) né gli zip vecchi.
 
 ## Provarla sul proprio PC (facoltativo)
 
